@@ -1,0 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 14% 96%;
+    --foreground: 210 38% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 38% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 38% 10%;
+
+    --primary: 221 76% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 14% 96%;
+    --secondary-foreground: 210 38% 10%;
+
+    --muted: 210 14% 96%;
+    --muted-foreground: 210 12% 40%;
+
+    --accent: 210 14% 93%;
+    --accent-foreground: 210 38% 10%;
+
+    --destructive: 0 78% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 212 16% 90%;
+    --input: 212 16% 90%;
+    --ring: 221 76% 48%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 38% 10%;
+    --sidebar-primary: 221 76% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 14% 96%;
+    --sidebar-accent-foreground: 210 38% 10%;
+    --sidebar-border: 212 16% 90%;
+    --sidebar-ring: 221 76% 48%;
+
+    --color-success: #0E9F6E;
+    --color-danger: #DC2626;
+    --color-warning: #B45309;
+    --color-teal: #0891B2;
+    --color-purple: #7C3AED;
+    --color-primary-blue: #1A56DB;
+
+    --text-primary: #0F1923;
+    --text-secondary: #5C6B7A;
+    --text-tertiary: #9BAAB8;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --background: 220 20% 7%;
+    --foreground: 210 20% 95%;
+
+    --card: 220 18% 10%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 220 18% 10%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 221 76% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 16% 14%;
+    --secondary-foreground: 210 20% 95%;
+
+    --muted: 220 16% 14%;
+    --muted-foreground: 210 12% 60%;
+
+    --accent: 220 16% 14%;
+    --accent-foreground: 210 20% 95%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 16% 16%;
+    --input: 220 16% 16%;
+    --ring: 221 76% 56%;
+
+    --sidebar-background: 220 18% 8%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 221 76% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 16% 14%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 220 16% 16%;
+    --sidebar-ring: 221 76% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at top left, rgba(26, 86, 219, 0.08), transparent 28%),
+      radial-gradient(circle at top right, rgba(6, 148, 162, 0.08), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(244, 246, 248, 0.98));
+    background-attachment: fixed;
+    color: var(--text-primary);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  .font-mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+
+  /* Variante de section-label standalone fora de cards */
+  p.section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  p.section-label::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--color-primary-blue);
+    opacity: 0.45;
+    flex-shrink: 0;
+  }
+
+  .kpi-value {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: clamp(1.35rem, 1.08rem + 0.7vw, 1.7rem);
+    font-weight: 700;
+    line-height: 0.98;
+    letter-spacing: -0.04em;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-value-lg {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: clamp(1.45rem, 1.14rem + 0.82vw, 1.85rem);
+    font-weight: 700;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: rgba(26, 86, 219, 0.14);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 150ms ease-out both;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 300ms ease-out both;
+  }
+
+  .animate-chart-in {
+    animation: chartIn 300ms ease-out both;
+  }
+
+  .bg-dashboard-grid {
+    background-image:
+      linear-gradient(rgba(226, 230, 235, 0.48) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(226, 230, 235, 0.48) 1px, transparent 1px);
+    background-position: -1px -1px;
+    background-size: 24px 24px;
+  }
+
+  .panel-shell {
+    @apply rounded-[22px] border border-white/80 bg-white/90 shadow-card backdrop-blur-sm;
+  }
+
+  /* Tabela: hover nas linhas do corpo */
+  .panel-shell table tbody tr {
+    transition: background-color 100ms ease;
+  }
+
+  .panel-shell table tbody tr:hover {
+    background-color: rgba(238, 243, 255, 0.55) !important;
+  }
+
+  .panel-muted {
+    @apply rounded-[18px] border border-[#E2E6EB] bg-[#F7F9FB];
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes chartIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-slide-up,
+    .animate-chart-in {
+      animation: none;
+    }
+    * {
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

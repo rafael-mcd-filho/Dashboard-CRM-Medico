@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">V4 Dash for Derick Vinhas</title>
+  <desc id="desc">Rounded square favicon with V4 monogram.</desc>
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#132033" />
+      <stop offset="1" stop-color="#0b1220" />
+    </linearGradient>
+    <linearGradient id="accent" x1="24" y1="22" x2="50" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38bdf8" />
+      <stop offset="1" stop-color="#2563eb" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#bg)" />
+  <circle cx="48" cy="15" r="5" fill="#22c55e" />
+  <path d="M17 18h6l5 18 5-18h6l-8 28h-6z" fill="#f8fafc" />
+  <path d="M45 18h5v16h4v5h-4v7h-5v-7H34v-4z" fill="url(#accent)" />
+</svg>

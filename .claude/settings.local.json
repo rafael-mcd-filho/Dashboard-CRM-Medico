@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py --version)",
+      "Bash(where python:*)",
+      "Bash(where py:*)",
+      "Bash(py \"C:\\\\Users\\\\adami\\\\.claude\\\\plugins\\\\marketplaces\\\\ui-ux-pro-max-skill\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"healthcare clinic analytics dashboard SaaS professional compact\" --design-system -p \"Clinic CRM Dashboard\" -f markdown)",
+      "Bash(curl -s \"https://hoqcazkwclpngawmwbon.supabase.co/rest/v1/\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvcWNhemt3Y2xwbmdhd213Ym9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyOTU0OTIsImV4cCI6MjA4OTg3MTQ5Mn0.ngB5laERhxrONnj2U71T8_R8ugS4uzMuOAuFx1twfcI\")",
+      "Bash(npx skills:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ]
+  }
+}
