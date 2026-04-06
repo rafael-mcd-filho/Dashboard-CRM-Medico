@@ -14,17 +14,17 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
     ? userId
       ? "Sua conta nao possui permissao para este acesso."
       : "Sua conta ainda nao possui permissao para acessar o dashboard."
-    : "Este usuario nao esta liberado para acessar o dashboard.";
+    : "Voce nao tem permissao para acessar esta aba.";
 
   const description = isAccountDenied
     ? userId
       ? "A autenticacao foi concluida, mas a conta atual nao possui vinculo ativo com o userid informado. Se isso estiver incorreto, solicite a revisao do acesso ao administrador do CRM."
       : "A autenticacao foi concluida, mas nenhuma permissao ativa foi encontrada para a conta atual. Solicite a liberacao ao administrador do CRM."
-    : "O conteudo deste painel e exibido apenas para usuarios previamente autorizados. Se voce recebeu este link e acredita que o bloqueio e indevido, valide o userid informado e contate o administrador do CRM.";
+    : "Se voce acredita que isso e um engano, contacte o administrador do CRM.";
 
   const statusText = isAccountDenied
     ? "Autenticacao concluida, mas sem permissao ativa para este painel."
-    : "Acesso negado para a credencial informada.";
+    : "Acesso negado.";
 
   const actionText = isAccountDenied
     ? "Solicite a associacao da sua conta com o acesso correto no CRM."
@@ -34,7 +34,7 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
     ? userId
       ? "A conta autenticada nao possui vinculo com o userid solicitado."
       : "Nenhuma permissao ativa foi localizada para a conta autenticada."
-    : "O painel reconheceu a requisicao, mas o usuario nao faz parte da allowlist atual.";
+    : "O userid informado nao possui acesso a esta aba.";
 
   return (
     <AccessShell
@@ -96,9 +96,18 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-[#0F1923]">O que verificar agora</p>
                 <div className="space-y-2 text-sm leading-7 text-[#5C6B7A]">
-                  <p>Confirme se o link foi aberto com o <span className="font-mono">userid</span> correto.</p>
-                  <p>Verifique se a conta autenticada esta vinculada ao acesso esperado.</p>
-                  <p>Se o bloqueio nao era esperado, revise as permissoes configuradas no CRM.</p>
+                  {isAccountDenied ? (
+                    <>
+                      <p>Confirme se o link foi aberto com o <span className="font-mono">userid</span> correto.</p>
+                      <p>Verifique se a conta autenticada esta vinculada ao acesso esperado.</p>
+                      <p>Se o bloqueio nao era esperado, revise as permissoes configuradas no CRM.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>Voce nao tem permissao para acessar esta aba.</p>
+                      <p>Se acredita que isso e um engano, contacte o administrador do CRM.</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
