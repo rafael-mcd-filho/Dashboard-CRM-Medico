@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import PainelLayout from "./pages/PainelLayout";
 import NotFound from "./pages/NotFound";
 import AbaGeral from "./pages/AbaGeral";
@@ -15,6 +16,12 @@ import AbaProcedimentosCirurgicos from "./pages/AbaProcedimentosCirurgicos";
 
 const queryClient = new QueryClient();
 
+const RootRedirect = () => {
+  const location = useLocation();
+
+  return <Navigate to={{ pathname: "/visao-geral", search: location.search }} replace />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -22,8 +29,15 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<PainelLayout />}>
-            <Route index element={<Navigate to="/visao-geral" replace />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <PainelLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<RootRedirect />} />
             <Route path="visao-geral" element={<AbaGeral />} />
             <Route path="contatos" element={<AbaContatos />} />
             <Route path="consultas" element={<AbaConsultas />} />
@@ -31,7 +45,14 @@ const App = () => (
             <Route path="espirometria" element={<AbaEspirometria />} />
             <Route path="procedimentos-cirurgicos" element={<AbaProcedimentosCirurgicos />} />
           </Route>
-          <Route path="agenda/isolada" element={<AgendaIsolada />} />
+          <Route
+            path="agenda/isolada"
+            element={
+              <ProtectedRoute>
+                <AgendaIsolada />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

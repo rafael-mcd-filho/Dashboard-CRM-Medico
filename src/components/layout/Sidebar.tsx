@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -19,6 +19,8 @@ const navItems = [
 ];
 
 export function Sidebar() {
+  const { search } = useLocation();
+
   return (
     <aside aria-label="Navegação principal" className="flex h-screen w-[220px] shrink-0 flex-col border-r border-border bg-white shadow-sidebar">
       {/* Brand */}
@@ -38,7 +40,7 @@ export function Sidebar() {
         {navItems.map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}
-            to={path}
+            to={{ pathname: path, search }}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clinic-blue focus-visible:ring-inset",
