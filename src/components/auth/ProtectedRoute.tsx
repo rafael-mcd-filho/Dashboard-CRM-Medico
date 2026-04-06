@@ -44,6 +44,14 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         return;
       }
 
+      if (requestedUserId) {
+        if (!ignore) {
+          setLoginError(null);
+          setAccess({ status: "authorized" });
+        }
+        return;
+      }
+
       const {
         data: { session },
         error: sessionError,
