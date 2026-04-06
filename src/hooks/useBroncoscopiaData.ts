@@ -30,13 +30,11 @@ type BroncoscopiaRow = {
   etapa_no_crm: string | null;
   tipo_paciente: string | null;
   modalidade_pagamento: string | null;
-  origem: string | null;
   quantidade_codigos: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
   data_pagamento: string | null;
   valor_atribuido: string | null;
-  vinculo: string | null;
 };
 
 type ContatoOrigemRow = {
@@ -370,8 +368,8 @@ export function useBroncoscopiaData() {
         .from("broncoscopia")
         .select(
           "id, contato_id, nome_contato, responsavel, etapa_no_crm, tipo_paciente, " +
-            "modalidade_pagamento, origem, quantidade_codigos, data_criacao_card, " +
-            "data_agendamento, data_pagamento, valor_atribuido, vinculo"
+            "modalidade_pagamento, quantidade_codigos, data_criacao_card, " +
+            "data_agendamento, data_pagamento, valor_atribuido"
         );
 
       if (error) throw error;

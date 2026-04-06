@@ -44,11 +44,9 @@ type ConsultaRow = RowBase & {
 };
 
 type ExameRow = RowBase & {
-  vinculo: string | null;
 };
 
 type CirurgiaRow = RowBase & {
-  vinculo: string | null;
   custo_anestesia: string | null;
   custo_comissao: string | null;
   custo_hospital: string | null;
@@ -595,7 +593,7 @@ export function useVisaoGeralData() {
       const { data, error } = await supabase
         .from("espirometria")
         .select(
-          "id, nome_contato, vinculo, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
+          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
             "data_pagamento, data_agendamento, contato_id"
         );
 
@@ -611,7 +609,7 @@ export function useVisaoGeralData() {
       const { data, error } = await supabase
         .from("broncoscopia")
         .select(
-          "id, nome_contato, vinculo, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
+          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
             "data_pagamento, data_agendamento, contato_id"
         );
 
@@ -627,7 +625,7 @@ export function useVisaoGeralData() {
       const { data, error } = await supabase
         .from("procedimentos_cirurgicos")
         .select(
-          "id, nome_contato, vinculo, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
+          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
             "data_pagamento, data_agendamento, contato_id, custo_anestesia, " +
             "custo_comissao, custo_hospital, custo_instrumentacao, impostos"
         );

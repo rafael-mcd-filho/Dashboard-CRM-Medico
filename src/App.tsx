@@ -13,6 +13,7 @@ import AbaConsultas from "./pages/AbaConsultas";
 import AbaBroncoscopia from "./pages/AbaBroncoscopia";
 import AbaEspirometria from "./pages/AbaEspirometria";
 import AbaProcedimentosCirurgicos from "./pages/AbaProcedimentosCirurgicos";
+import EmDesenvolvimentoIsolada from "./pages/EmDesenvolvimentoIsolada";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,14 @@ const App = () => (
             <Route path="espirometria" element={<AbaEspirometria />} />
             <Route path="procedimentos-cirurgicos" element={<AbaProcedimentosCirurgicos />} />
           </Route>
+          <Route
+            path="em-desenvolvimento/isolada"
+            element={
+              <ProtectedRoute allowRecognizedUserIdAccess={false}>
+                <EmDesenvolvimentoIsolada />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="agenda/isolada"
             element={

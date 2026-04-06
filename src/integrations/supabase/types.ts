@@ -88,14 +88,12 @@ export type Database = {
           link_da_conversa: string | null
           modalidade_pagamento: string | null
           nome_contato: string | null
-          origem: string | null
           quantidade_codigos: string | null
           responsavel: string | null
           tag_id_card: string | null
-          tag_name_contato: string | null
+          tag_names_card: string | null
           tipo_paciente: string | null
           valor_atribuido: string | null
-          vinculo: string | null
         }
         Insert: {
           contato_id?: string | null
@@ -116,14 +114,12 @@ export type Database = {
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
-          origem?: string | null
           quantidade_codigos?: string | null
           responsavel?: string | null
           tag_id_card?: string | null
-          tag_name_contato?: string | null
+          tag_names_card?: string | null
           tipo_paciente?: string | null
           valor_atribuido?: string | null
-          vinculo?: string | null
         }
         Update: {
           contato_id?: string | null
@@ -144,14 +140,12 @@ export type Database = {
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
-          origem?: string | null
           quantidade_codigos?: string | null
           responsavel?: string | null
           tag_id_card?: string | null
-          tag_name_contato?: string | null
+          tag_names_card?: string | null
           tipo_paciente?: string | null
           valor_atribuido?: string | null
-          vinculo?: string | null
         }
         Relationships: []
       }
@@ -174,10 +168,9 @@ export type Database = {
           link_da_conversa: string | null
           modalidade_pagamento: string | null
           nome_contato: string | null
-          origem: string | null
           responsavel: string | null
           tag_id_card: string | null
-          tag_name_contato: string | null
+          tag_names_card: string | null
           tipo_consulta: string | null
           valor_atribuido: string | null
         }
@@ -199,10 +192,9 @@ export type Database = {
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
-          origem?: string | null
           responsavel?: string | null
           tag_id_card?: string | null
-          tag_name_contato?: string | null
+          tag_names_card?: string | null
           tipo_consulta?: string | null
           valor_atribuido?: string | null
         }
@@ -224,10 +216,9 @@ export type Database = {
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
-          origem?: string | null
           responsavel?: string | null
           tag_id_card?: string | null
-          tag_name_contato?: string | null
+          tag_names_card?: string | null
           tipo_consulta?: string | null
           valor_atribuido?: string | null
         }
@@ -252,12 +243,10 @@ export type Database = {
           link_da_conversa: string | null
           modalidade_pagamento: string | null
           nome_contato: string | null
-          origem: string | null
           responsavel: string | null
           tag_id_card: string | null
-          tag_name_contato: string | null
+          tag_names_card: string | null
           valor_atribuido: string | null
-          vinculo: string | null
         }
         Insert: {
           contato_id?: string | null
@@ -277,12 +266,10 @@ export type Database = {
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
-          origem?: string | null
           responsavel?: string | null
           tag_id_card?: string | null
-          tag_name_contato?: string | null
+          tag_names_card?: string | null
           valor_atribuido?: string | null
-          vinculo?: string | null
         }
         Update: {
           contato_id?: string | null
@@ -302,12 +289,10 @@ export type Database = {
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
-          origem?: string | null
           responsavel?: string | null
           tag_id_card?: string | null
-          tag_name_contato?: string | null
+          tag_names_card?: string | null
           valor_atribuido?: string | null
-          vinculo?: string | null
         }
         Relationships: []
       }
@@ -335,14 +320,12 @@ export type Database = {
           link_da_conversa: string | null
           modalidade_pagamento: string | null
           nome_contato: string | null
-          origem: string | null
           responsavel: string | null
           tag_id_card: string | null
-          tag_name_contato: string | null
+          tag_names_card: string | null
           tipo_paciente: string | null
           valor_atribuido: string | null
           valor_liquido: number | null
-          vinculo: string | null
         }
         Insert: {
           contato_id?: string | null
@@ -367,14 +350,12 @@ export type Database = {
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
-          origem?: string | null
           responsavel?: string | null
           tag_id_card?: string | null
-          tag_name_contato?: string | null
+          tag_names_card?: string | null
           tipo_paciente?: string | null
           valor_atribuido?: string | null
           valor_liquido?: number | null
-          vinculo?: string | null
         }
         Update: {
           contato_id?: string | null
@@ -399,14 +380,12 @@ export type Database = {
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
-          origem?: string | null
           responsavel?: string | null
           tag_id_card?: string | null
-          tag_name_contato?: string | null
+          tag_names_card?: string | null
           tipo_paciente?: string | null
           valor_atribuido?: string | null
           valor_liquido?: number | null
-          vinculo?: string | null
         }
         Relationships: []
       }

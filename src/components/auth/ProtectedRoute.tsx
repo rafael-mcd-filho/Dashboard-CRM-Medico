@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type ProtectedRouteProps = {
   children: ReactNode;
+  allowRecognizedUserIdAccess?: boolean;
 };
 
 type AccessViewState =
@@ -19,7 +20,10 @@ type AccessViewState =
   | { status: "denied"; userId: string | null; mode: "userid" | "account" }
   | { status: "config-error"; details?: string };
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+const ProtectedRoute = ({
+  children,
+  allowRecognizedUserIdAccess = true,
+}: ProtectedRouteProps) => {
   const location = useLocation();
   const [access, setAccess] = useState<AccessViewState>({ status: "loading" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,7 +48,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         return;
       }
 
-      if (requestedUserId) {
+      if (requestedUserId && allowRecognizedUserIdAccess) {
         if (!ignore) {
           setLoginError(null);
           setAccess({ status: "authorized" });
@@ -120,7 +124,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       ignore = true;
       subscription.unsubscribe();
     };
-  }, [location.search]);
+  }, [allowRecognizedUserIdAccess, location.search]);
 
   const handleLogin = async ({ email, password }: { email: string; password: string }) => {
     setIsSubmitting(true);

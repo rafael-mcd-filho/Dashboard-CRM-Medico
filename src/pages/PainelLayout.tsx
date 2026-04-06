@@ -5,7 +5,9 @@ import { GlobalFilters } from "@/components/layout/GlobalFilters";
 
 const PainelLayout = () => {
   const location = useLocation();
-  const isAgendaRoute = location.pathname.startsWith("/agenda");
+  const hidesGlobalFilters =
+    location.pathname.startsWith("/agenda") ||
+    location.pathname.startsWith("/em-desenvolvimento");
 
   return (
     <FiltersProvider>
@@ -18,7 +20,7 @@ const PainelLayout = () => {
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
-          {!isAgendaRoute ? <GlobalFilters /> : null}
+          {!hidesGlobalFilters ? <GlobalFilters /> : null}
           <main id="main" className="flex-1 overflow-y-auto p-6">
             <Outlet />
           </main>
