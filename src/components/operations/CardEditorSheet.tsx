@@ -14,14 +14,15 @@ import {
   FUNNEL_CARD_META,
   createFunnelCardDraft,
   getCardTypeValue,
-  isBroncoscopiaCard,
-  isProcedimentoCard,
   type FunnelCardDraft,
   type UnifiedFunnelCard,
 } from "@/lib/funnelCards";
 
+type CardEditorSheetMode = "view" | "edit";
+
 type CardEditorSheetProps = {
   card: UnifiedFunnelCard | null;
+  mode: CardEditorSheetMode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (draft: FunnelCardDraft) => Promise<void>;
@@ -36,7 +37,7 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="space-y-1.5">
+    <label className="flex flex-col gap-1.5">
       <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
         {label}
       </span>
@@ -45,8 +46,24 @@ function Field({
   );
 }
 
+function ReadonlyInput({ value }: { value: string }) {
+  return (
+    <Input
+      value={value}
+      readOnly
+      className="h-11 rounded-xl border-[#D8E0E8] bg-[#F7F9FB] text-[#40505F]"
+    />
+  );
+}
+
+function emptyLabel(value: string | null | undefined, fallback = "Nao informado") {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
 export function CardEditorSheet({
   card,
+  mode,
   open,
   onOpenChange,
   onSave,
@@ -64,6 +81,8 @@ export function CardEditorSheet({
 
   const meta = FUNNEL_CARD_META[card.funnel];
   const Icon = meta.icon;
+  const isEditMode = mode === "edit";
+  const typeValue = getCardTypeValue(card);
 
   const updateField = <K extends keyof FunnelCardDraft>(
     field: K,
@@ -71,8 +90,6 @@ export function CardEditorSheet({
   ) => {
     setDraft((current) => (current ? { ...current, [field]: value } : current));
   };
-
-  const typeValue = getCardTypeValue(card);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -91,122 +108,107 @@ export function CardEditorSheet({
               </span>
               <span className="rounded-full border border-[#E2E6EB] bg-[#FAFBFC] px-3 py-1 text-[11px] font-medium text-[#5C6B7A]">
                 CRM key:{" "}
-                <span className="font-mono text-[#0F1923]">{card.key || "—"}</span>
+                <span className="font-mono text-[#0F1923]">
+                  {card.key || "-"}
+                </span>
               </span>
               <span className="rounded-full border border-[#E2E6EB] bg-[#FAFBFC] px-3 py-1 text-[11px] font-medium text-[#5C6B7A]">
                 Card:{" "}
                 <span className="font-mono text-[#0F1923]">
-                  {card.id_do_card || "—"}
+                  {card.id_do_card || "-"}
                 </span>
               </span>
             </div>
+
             <SheetTitle className="mt-3 text-[1.45rem] font-semibold tracking-[-0.04em] text-[#0F1923]">
-              Editar card operacional
+              {isEditMode ? "Editar card operacional" : "Visualizar card operacional"}
             </SheetTitle>
             <SheetDescription className="max-w-[60ch] text-[13px] leading-6 text-[#5C6B7A]">
-              Ajuste os campos do card selecionado e salve para refletir a alteracao diretamente no banco.
+              {isEditMode
+                ? "Somente data de pagamento, valor e descricao podem ser alterados nesta tela."
+                : "Consulte os dados consolidados do card. Para ajustes, use a acao de editar."}
             </SheetDescription>
           </SheetHeader>
 
           <div className="flex-1 space-y-6 px-6 py-5">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-[22px] border border-[#DCE7F8] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FAFF_100%)] p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
-                  Identificacao
+                  Contato
                 </p>
-                <div className="mt-3 space-y-2 text-sm text-[#40505F]">
-                  <p>
-                    <span className="font-medium text-[#0F1923]">Contato ID:</span>{" "}
-                    <span className="font-mono">{card.contato_id || "—"}</span>
-                  </p>
-                  <p>
-                    <span className="font-medium text-[#0F1923]">Tipo atual:</span>{" "}
-                    {typeValue || "Nao definido"}
-                  </p>
-                  <p>
-                    <span className="font-medium text-[#0F1923]">Tabela:</span>{" "}
-                    <span className="font-mono">{card.table}</span>
-                  </p>
-                </div>
+                <p className="mt-3 text-base font-semibold text-[#0F1923]">
+                  {emptyLabel(card.nome_contato, "Sem nome")}
+                </p>
+                <p className="mt-1 font-mono text-[12px] text-[#5C6B7A]">
+                  {emptyLabel(card.contato_id, "-")}
+                </p>
               </div>
 
               <div className="rounded-[22px] border border-[#E2E6EB] bg-[#FAFBFC] p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
-                  Regras desta tela
+                  Agendamento
                 </p>
-                <div className="mt-3 space-y-2 text-sm leading-6 text-[#5C6B7A]">
-                  <p>Campos vazios sao salvos como nulo.</p>
-                  <p>Datas podem ser informadas no mesmo formato que voce importa hoje.</p>
-                  <p>Essa edicao atua apenas no card do funil, nao no cadastro de contatos.</p>
-                </div>
+                <p className="mt-3 text-base font-semibold text-[#0F1923]">
+                  {emptyLabel(card.data_agendamento, "Nao agendado")}
+                </p>
+                <p className="mt-1 text-[12px] text-[#5C6B7A]">
+                  {emptyLabel(card.horario_agendamento, "Sem horario")}
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-[#E2E6EB] bg-[#FAFBFC] p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
+                  Pagamento
+                </p>
+                <p className="mt-3 text-base font-semibold text-[#0F1923]">
+                  {card.data_pagamento ? "Pago" : "Pendente"}
+                </p>
+                <p className="mt-1 text-[12px] text-[#5C6B7A]">
+                  {emptyLabel(card.data_pagamento, "Sem data de pagamento")}
+                </p>
               </div>
             </div>
 
             <section className="rounded-[24px] border border-[#E2E6EB] bg-white p-5 shadow-[0_16px_36px_rgba(15,25,35,0.04)]">
               <div className="mb-4">
                 <h3 className="text-[15px] font-semibold text-[#0F1923]">
-                  Campos principais
+                  Dados do card
                 </h3>
                 <p className="mt-1 text-[13px] text-[#5C6B7A]">
-                  Edite os dados comuns do card antes de ajustar os campos especificos do funil.
+                  Os campos abaixo servem para consulta operacional. Apenas os
+                  campos de pagamento, valor e descricao podem ser alterados.
                 </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Nome do contato">
-                  <Input
-                    value={draft.nome_contato}
-                    onChange={(event) =>
-                      updateField("nome_contato", event.target.value)
-                    }
-                    className="h-11 rounded-xl border-[#D8E0E8]"
-                  />
+                <Field label="Funil">
+                  <ReadonlyInput value={meta.label} />
+                </Field>
+                <Field label="Contato">
+                  <ReadonlyInput value={emptyLabel(draft.nome_contato, "Sem nome")} />
                 </Field>
                 <Field label="Responsavel">
-                  <Input
-                    value={draft.responsavel}
-                    onChange={(event) =>
-                      updateField("responsavel", event.target.value)
-                    }
-                    className="h-11 rounded-xl border-[#D8E0E8]"
+                  <ReadonlyInput
+                    value={emptyLabel(draft.responsavel, "Nao informado")}
                   />
                 </Field>
-                <Field label="Etapa no CRM">
-                  <Input
-                    value={draft.etapa_no_crm}
-                    onChange={(event) =>
-                      updateField("etapa_no_crm", event.target.value)
-                    }
-                    className="h-11 rounded-xl border-[#D8E0E8]"
-                  />
+                <Field label="Tipo de paciente">
+                  <ReadonlyInput value={emptyLabel(typeValue, "Nao informado")} />
                 </Field>
                 <Field label="Modalidade de pagamento">
-                  <Input
-                    value={draft.modalidade_pagamento}
-                    onChange={(event) =>
-                      updateField("modalidade_pagamento", event.target.value)
-                    }
-                    className="h-11 rounded-xl border-[#D8E0E8]"
+                  <ReadonlyInput
+                    value={emptyLabel(
+                      draft.modalidade_pagamento,
+                      "Nao informada"
+                    )}
                   />
                 </Field>
-                <Field label="Data de agendamento">
-                  <Input
-                    value={draft.data_agendamento}
-                    onChange={(event) =>
-                      updateField("data_agendamento", event.target.value)
-                    }
-                    placeholder="DD/MM/AAAA"
-                    className="h-11 rounded-xl border-[#D8E0E8]"
-                  />
-                </Field>
-                <Field label="Horario de agendamento">
-                  <Input
-                    value={draft.horario_agendamento}
-                    onChange={(event) =>
-                      updateField("horario_agendamento", event.target.value)
-                    }
-                    placeholder="HH:MM"
-                    className="h-11 rounded-xl border-[#D8E0E8]"
+                <Field label="Agendamento">
+                  <ReadonlyInput
+                    value={[
+                      emptyLabel(draft.data_agendamento, "Nao agendado"),
+                      emptyLabel(draft.horario_agendamento, "Sem horario"),
+                    ].join("  |  ")}
                   />
                 </Field>
                 <Field label="Data de pagamento">
@@ -215,148 +217,59 @@ export function CardEditorSheet({
                     onChange={(event) =>
                       updateField("data_pagamento", event.target.value)
                     }
+                    readOnly={!isEditMode}
                     placeholder="DD/MM/AAAA"
-                    className="h-11 rounded-xl border-[#D8E0E8]"
+                    className={`h-11 rounded-xl border-[#D8E0E8] ${
+                      isEditMode ? "bg-white" : "bg-[#F7F9FB] text-[#40505F]"
+                    }`}
                   />
                 </Field>
-                <Field label="Valor atribuido">
+                <Field label="Valor">
                   <Input
                     value={draft.valor_atribuido}
                     onChange={(event) =>
                       updateField("valor_atribuido", event.target.value)
                     }
+                    readOnly={!isEditMode}
                     placeholder="Ex.: 1500 ou R$ 1.500,00"
-                    className="h-11 rounded-xl border-[#D8E0E8]"
-                  />
-                </Field>
-                <Field label="Link da conversa">
-                  <Input
-                    value={draft.link_da_conversa}
-                    onChange={(event) =>
-                      updateField("link_da_conversa", event.target.value)
-                    }
-                    className="h-11 rounded-xl border-[#D8E0E8]"
-                  />
-                </Field>
-                <Field label="Contato ID">
-                  <Input
-                    value={draft.contato_id}
-                    readOnly
-                    className="h-11 rounded-xl border-[#D8E0E8] bg-[#F7F9FB] font-mono text-[#5C6B7A]"
+                    className={`h-11 rounded-xl border-[#D8E0E8] ${
+                      isEditMode ? "bg-white" : "bg-[#F7F9FB] text-[#40505F]"
+                    }`}
                   />
                 </Field>
               </div>
 
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Field label="Link da conversa">
+                  <ReadonlyInput
+                    value={emptyLabel(draft.link_da_conversa, "Nao informado")}
+                  />
+                </Field>
+                <Field label="Tabela de origem">
+                  <ReadonlyInput value={draft.table} />
+                </Field>
+              </div>
+
               <div className="mt-4">
-                <Field label="Descricao do card">
+                <Field label="Descricao">
                   <Textarea
                     value={draft.descricao_card}
                     onChange={(event) =>
                       updateField("descricao_card", event.target.value)
                     }
-                    className="min-h-[140px] rounded-2xl border-[#D8E0E8]"
+                    readOnly={!isEditMode}
+                    className={`min-h-[152px] rounded-2xl border-[#D8E0E8] ${
+                      isEditMode ? "bg-white" : "bg-[#F7F9FB] text-[#40505F]"
+                    }`}
                   />
                 </Field>
               </div>
-            </section>
 
-            <section className="rounded-[24px] border border-[#E2E6EB] bg-[#FCFDFE] p-5">
-              <div className="mb-4">
-                <h3 className="text-[15px] font-semibold text-[#0F1923]">
-                  Campos do funil
-                </h3>
-                <p className="mt-1 text-[13px] text-[#5C6B7A]">
-                  Ajustes especificos para {meta.label.toLowerCase()}.
-                </p>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                {card.funnel === "consultas" ? (
-                  <Field label="Tipo de consulta">
-                    <Input
-                      value={draft.tipo_consulta}
-                      onChange={(event) =>
-                        updateField("tipo_consulta", event.target.value)
-                      }
-                      className="h-11 rounded-xl border-[#D8E0E8]"
-                    />
-                  </Field>
-                ) : null}
-
-                {isBroncoscopiaCard(card) || isProcedimentoCard(card) ? (
-                  <Field label="Tipo de paciente">
-                    <Input
-                      value={draft.tipo_paciente}
-                      onChange={(event) =>
-                        updateField("tipo_paciente", event.target.value)
-                      }
-                      className="h-11 rounded-xl border-[#D8E0E8]"
-                    />
-                  </Field>
-                ) : null}
-
-                {isBroncoscopiaCard(card) ? (
-                  <Field label="Quantidade de codigos">
-                    <Input
-                      value={draft.quantidade_codigos}
-                      onChange={(event) =>
-                        updateField("quantidade_codigos", event.target.value)
-                      }
-                      className="h-11 rounded-xl border-[#D8E0E8]"
-                    />
-                  </Field>
-                ) : null}
-
-                {isProcedimentoCard(card) ? (
-                  <>
-                    <Field label="Custo hospital">
-                      <Input
-                        value={draft.custo_hospital}
-                        onChange={(event) =>
-                          updateField("custo_hospital", event.target.value)
-                        }
-                        className="h-11 rounded-xl border-[#D8E0E8]"
-                      />
-                    </Field>
-                    <Field label="Custo anestesia">
-                      <Input
-                        value={draft.custo_anestesia}
-                        onChange={(event) =>
-                          updateField("custo_anestesia", event.target.value)
-                        }
-                        className="h-11 rounded-xl border-[#D8E0E8]"
-                      />
-                    </Field>
-                    <Field label="Custo comissao">
-                      <Input
-                        value={draft.custo_comissao}
-                        onChange={(event) =>
-                          updateField("custo_comissao", event.target.value)
-                        }
-                        className="h-11 rounded-xl border-[#D8E0E8]"
-                      />
-                    </Field>
-                    <Field label="Custo instrumentacao">
-                      <Input
-                        value={draft.custo_instrumentacao}
-                        onChange={(event) =>
-                          updateField("custo_instrumentacao", event.target.value)
-                        }
-                        className="h-11 rounded-xl border-[#D8E0E8]"
-                      />
-                    </Field>
-                    <Field label="Impostos">
-                      <Input
-                        value={draft.impostos}
-                        onChange={(event) =>
-                          updateField("impostos", event.target.value)
-                        }
-                        className="h-11 rounded-xl border-[#D8E0E8]"
-                      />
-                    </Field>
-                  </>
-                ) : null}
-              </div>
+              {!isEditMode ? (
+                <div className="mt-4 rounded-2xl border border-[#E6ECF2] bg-[#FAFBFC] px-4 py-3 text-[13px] text-[#5C6B7A]">
+                  Esta visualizacao e somente leitura.
+                </div>
+              ) : null}
             </section>
           </div>
 
@@ -376,7 +289,7 @@ export function CardEditorSheet({
                       rel="noreferrer"
                     >
                       Abrir conversa
-                      <ExternalLink className="h-4 w-4" />
+                      <ExternalLink data-icon="inline-end" />
                     </a>
                   </Button>
                 ) : null}
@@ -389,17 +302,19 @@ export function CardEditorSheet({
                   className="h-10 rounded-xl border-[#D8E0E8]"
                   onClick={() => onOpenChange(false)}
                 >
-                  Cancelar
+                  Fechar
                 </Button>
-                <Button
-                  type="button"
-                  className="h-10 rounded-xl bg-clinic-blue px-5"
-                  onClick={() => void onSave(draft)}
-                  disabled={isSaving}
-                >
-                  <Save className="h-4 w-4" />
-                  {isSaving ? "Salvando..." : "Salvar alteracoes"}
-                </Button>
+                {isEditMode ? (
+                  <Button
+                    type="button"
+                    className="h-10 rounded-xl bg-clinic-blue px-5"
+                    onClick={() => void onSave(draft)}
+                    disabled={isSaving}
+                  >
+                    <Save data-icon="inline-start" />
+                    {isSaving ? "Salvando..." : "Salvar alteracoes"}
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>

@@ -1,13 +1,13 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  Eye,
   Filter,
   Hammer,
   Search,
   SquarePen,
-  TriangleAlert,
 } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
+import { CardEditorSheet } from "@/components/operations/CardEditorSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "@/components/ui/sonner";
 import {
   Table,
   TableBody,
@@ -25,8 +26,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CardEditorSheet } from "@/components/operations/CardEditorSheet";
 import { useOperacaoCardsData } from "@/hooks/useOperacaoCardsData";
+import { supabase } from "@/integrations/supabase/client";
 import {
   FUNNEL_CARD_META,
   getCardTypeValue,
@@ -36,7 +37,6 @@ import {
 } from "@/lib/funnelCards";
 import { fmtBRL, fmtNum } from "@/lib/fmt";
 import { parseBRDate, parseMonetary } from "@/lib/parse";
-import { supabase } from "@/integrations/supabase/client";
 
 const PAGE_SIZE = 25;
 
@@ -48,13 +48,13 @@ function normalizeSearch(value: string) {
     .trim();
 }
 
-function formatDateLabel(value: string | null) {
-  return value && value.trim().length > 0 ? value : "—";
-}
-
 function emptyToNull(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function formatDateLabel(value: string | null) {
+  return value && value.trim().length > 0 ? value : "-";
 }
 
 function isWithinDateRange(value: string | null, from: string, to: string) {
@@ -73,27 +73,17 @@ function isWithinDateRange(value: string | null, from: string, to: string) {
 }
 
 async function saveCardDraft(draft: FunnelCardDraft) {
-  const commonPayload = {
-    nome_contato: emptyToNull(draft.nome_contato),
-    responsavel: emptyToNull(draft.responsavel),
-    etapa_no_crm: emptyToNull(draft.etapa_no_crm),
-    modalidade_pagamento: emptyToNull(draft.modalidade_pagamento),
-    data_agendamento: emptyToNull(draft.data_agendamento),
-    horario_agendamento: emptyToNull(draft.horario_agendamento),
+  const editablePayload = {
     data_pagamento: emptyToNull(draft.data_pagamento),
     valor_atribuido: emptyToNull(draft.valor_atribuido),
     descricao_card: emptyToNull(draft.descricao_card),
-    link_da_conversa: emptyToNull(draft.link_da_conversa),
   };
 
   switch (draft.table) {
     case "consultas": {
       const { error } = await supabase
         .from("consultas")
-        .update({
-          ...commonPayload,
-          tipo_consulta: emptyToNull(draft.tipo_consulta),
-        })
+        .update(editablePayload)
         .eq("id", draft.sourceId);
 
       if (error) throw error;
@@ -102,7 +92,7 @@ async function saveCardDraft(draft: FunnelCardDraft) {
     case "espirometria": {
       const { error } = await supabase
         .from("espirometria")
-        .update(commonPayload)
+        .update(editablePayload)
         .eq("id", draft.sourceId);
 
       if (error) throw error;
@@ -111,11 +101,7 @@ async function saveCardDraft(draft: FunnelCardDraft) {
     case "broncoscopia": {
       const { error } = await supabase
         .from("broncoscopia")
-        .update({
-          ...commonPayload,
-          tipo_paciente: emptyToNull(draft.tipo_paciente),
-          quantidade_codigos: emptyToNull(draft.quantidade_codigos),
-        })
+        .update(editablePayload)
         .eq("id", draft.sourceId);
 
       if (error) throw error;
@@ -124,15 +110,7 @@ async function saveCardDraft(draft: FunnelCardDraft) {
     case "procedimentos_cirurgicos": {
       const { error } = await supabase
         .from("procedimentos_cirurgicos")
-        .update({
-          ...commonPayload,
-          tipo_paciente: emptyToNull(draft.tipo_paciente),
-          custo_anestesia: emptyToNull(draft.custo_anestesia),
-          custo_comissao: emptyToNull(draft.custo_comissao),
-          custo_hospital: emptyToNull(draft.custo_hospital),
-          custo_instrumentacao: emptyToNull(draft.custo_instrumentacao),
-          impostos: emptyToNull(draft.impostos),
-        })
+        .update(editablePayload)
         .eq("id", draft.sourceId);
 
       if (error) throw error;
@@ -149,17 +127,15 @@ export default function AbaEmDesenvolvimento() {
   const [selectedCard, setSelectedCard] = useState<UnifiedFunnelCard | null>(
     null
   );
+  const [sheetMode, setSheetMode] = useState<"view" | "edit">("view");
   const [funnelFilter, setFunnelFilter] = useState<FunnelCardKey | "all">(
     "all"
   );
   const [responsavelFilter, setResponsavelFilter] = useState("__all__");
-  const [stageFilter, setStageFilter] = useState("__all__");
   const [paymentFilter, setPaymentFilter] = useState<
     "all" | "paid" | "unpaid"
   >("all");
   const [search, setSearch] = useState("");
-  const [minValue, setMinValue] = useState("");
-  const [maxValue, setMaxValue] = useState("");
   const [agendamentoFrom, setAgendamentoFrom] = useState("");
   const [agendamentoTo, setAgendamentoTo] = useState("");
   const [page, setPage] = useState(1);
@@ -184,30 +160,14 @@ export default function AbaEmDesenvolvimento() {
     ).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [funnelScopedCards]);
 
-  const stageOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        funnelScopedCards
-          .map((card) => (card.etapa_no_crm ?? "").trim())
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [funnelScopedCards]);
-
   const filteredCards = useMemo(() => {
     const normalizedSearch = normalizeSearch(deferredSearch);
-    const min = minValue.trim() ? parseMonetary(minValue) : null;
-    const max = maxValue.trim() ? parseMonetary(maxValue) : null;
 
     return funnelScopedCards.filter((card) => {
       if (
         responsavelFilter !== "__all__" &&
         (card.responsavel ?? "") !== responsavelFilter
       ) {
-        return false;
-      }
-
-      if (stageFilter !== "__all__" && (card.etapa_no_crm ?? "") !== stageFilter) {
         return false;
       }
 
@@ -223,10 +183,6 @@ export default function AbaEmDesenvolvimento() {
         return false;
       }
 
-      const value = parseMonetary(card.valor_atribuido);
-      if (min !== null && value < min) return false;
-      if (max !== null && value > max) return false;
-
       if (!normalizedSearch) return true;
 
       return [
@@ -236,6 +192,7 @@ export default function AbaEmDesenvolvimento() {
         card.id_do_card,
         card.responsavel,
         card.etapa_no_crm,
+        card.modalidade_pagamento,
         getCardTypeValue(card),
       ]
         .filter(Boolean)
@@ -248,11 +205,8 @@ export default function AbaEmDesenvolvimento() {
     agendamentoTo,
     deferredSearch,
     funnelScopedCards,
-    maxValue,
-    minValue,
     paymentFilter,
     responsavelFilter,
-    stageFilter,
   ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCards.length / PAGE_SIZE));
@@ -268,11 +222,8 @@ export default function AbaEmDesenvolvimento() {
   }, [
     funnelFilter,
     responsavelFilter,
-    stageFilter,
     paymentFilter,
     deferredSearch,
-    minValue,
-    maxValue,
     agendamentoFrom,
     agendamentoTo,
   ]);
@@ -280,6 +231,7 @@ export default function AbaEmDesenvolvimento() {
   useEffect(() => {
     if (selectedCard && !cards.some((card) => card.id === selectedCard.id)) {
       setSelectedCard(null);
+      setSheetMode("view");
     }
   }, [cards, selectedCard]);
 
@@ -310,6 +262,7 @@ export default function AbaEmDesenvolvimento() {
     onSuccess: async () => {
       toast.success("Card atualizado com sucesso.");
       setSelectedCard(null);
+      setSheetMode("view");
       await queryClient.invalidateQueries();
     },
     onError: (mutationError: Error) => {
@@ -328,8 +281,8 @@ export default function AbaEmDesenvolvimento() {
             </h1>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-[#5C6B7A]">
-            Central operacional para localizar cards dos funis e editar os dados
-            diretamente no banco.
+            Central operacional para localizar cards dos funis e editar apenas
+            pagamento, valor e descricao.
           </p>
         </div>
 
@@ -382,135 +335,132 @@ export default function AbaEmDesenvolvimento() {
             </h2>
           </div>
 
-          <div className="grid gap-3 xl:grid-cols-[1.6fr_repeat(5,minmax(0,1fr))]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9BAAB8]" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar por contato, ID, card, responsavel ou tipo"
-                className="h-11 rounded-xl border-[#D8E0E8] bg-white pl-9"
-              />
+          <div className="grid items-end gap-3 xl:grid-cols-[minmax(280px,1.6fr)_repeat(3,minmax(180px,1fr))_auto]">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
+                Busca
+              </span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9BAAB8]" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Contato, ID, card, responsavel ou modalidade"
+                  className="h-11 rounded-xl border-[#D8E0E8] bg-white pl-9"
+                />
+              </div>
             </div>
 
-            <Select
-              value={funnelFilter}
-              onValueChange={(value) =>
-                setFunnelFilter(value as FunnelCardKey | "all")
-              }
-            >
-              <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
-                <SelectValue placeholder="Funil" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os funis</SelectItem>
-                {(Object.keys(FUNNEL_CARD_META) as FunnelCardKey[]).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {FUNNEL_CARD_META[key].label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-              <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
-                <SelectValue placeholder="Responsavel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos responsaveis</SelectItem>
-                {responsavelOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={stageFilter} onValueChange={setStageFilter}>
-              <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
-                <SelectValue placeholder="Etapa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todas etapas</SelectItem>
-                {stageOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={paymentFilter}
-              onValueChange={(value) =>
-                setPaymentFilter(value as "all" | "paid" | "unpaid")
-              }
-            >
-              <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
-                <SelectValue placeholder="Pagamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos pagamentos</SelectItem>
-                <SelectItem value="paid">Com pagamento</SelectItem>
-                <SelectItem value="unpaid">Sem pagamento</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                value={agendamentoFrom}
-                onChange={(event) => setAgendamentoFrom(event.target.value)}
-                className="h-11 rounded-xl border-[#D8E0E8]"
-              />
-              <Input
-                type="date"
-                value={agendamentoTo}
-                onChange={(event) => setAgendamentoTo(event.target.value)}
-                className="h-11 rounded-xl border-[#D8E0E8]"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                value={minValue}
-                onChange={(event) => setMinValue(event.target.value)}
-                placeholder="Valor minimo"
-                className="h-11 rounded-xl border-[#D8E0E8]"
-              />
-              <Input
-                value={maxValue}
-                onChange={(event) => setMaxValue(event.target.value)}
-                placeholder="Valor maximo"
-                className="h-11 rounded-xl border-[#D8E0E8]"
-              />
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
+                Funil
+              </span>
+              <Select
+                value={funnelFilter}
+                onValueChange={(value) =>
+                  setFunnelFilter(value as FunnelCardKey | "all")
+                }
+              >
+                <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
+                  <SelectValue placeholder="Funil" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[280px]">
+                  <SelectItem value="all">Todos os funis</SelectItem>
+                  {(Object.keys(FUNNEL_CARD_META) as FunnelCardKey[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {FUNNEL_CARD_META[key].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="flex items-center gap-2 text-[12px] text-[#7C8B99]">
-              <TriangleAlert className="h-4 w-4 text-clinic-amber" />
-              Esta aba ignora os filtros globais do dashboard e usa apenas os filtros locais acima.
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
+                Responsavel
+              </span>
+              <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
+                <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
+                  <SelectValue placeholder="Responsavel" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[280px]">
+                  <SelectItem value="__all__">Todos responsaveis</SelectItem>
+                  {responsavelOptions.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
+                Pagamento
+              </span>
+              <Select
+                value={paymentFilter}
+                onValueChange={(value) =>
+                  setPaymentFilter(value as "all" | "paid" | "unpaid")
+                }
+              >
+                <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
+                  <SelectValue placeholder="Pagamento" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[280px]">
+                  <SelectItem value="all">Todos pagamentos</SelectItem>
+                  <SelectItem value="paid">Com pagamento</SelectItem>
+                  <SelectItem value="unpaid">Sem pagamento</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <Button
               type="button"
               variant="outline"
-              className="h-11 rounded-xl border-[#D8E0E8]"
+              className="h-11 rounded-xl border-[#D8E0E8] px-5"
               onClick={() => {
                 setFunnelFilter("all");
                 setResponsavelFilter("__all__");
-                setStageFilter("__all__");
                 setPaymentFilter("all");
                 setSearch("");
-                setMinValue("");
-                setMaxValue("");
                 setAgendamentoFrom("");
                 setAgendamentoTo("");
               }}
             >
               Limpar filtros
             </Button>
+          </div>
+
+          <div className="rounded-2xl border border-[#E6ECF2] bg-[#FAFBFC] p-3">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
+                  Data do agendamento
+                </p>
+                <p className="mt-1 text-[12px] text-[#5C6B7A]">
+                  Filtra cards cuja data de agendamento esteja entre a data
+                  inicial e a data final informadas.
+                </p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2 xl:w-[420px]">
+                <Input
+                  type="date"
+                  value={agendamentoFrom}
+                  onChange={(event) => setAgendamentoFrom(event.target.value)}
+                  aria-label="Data inicial do agendamento"
+                  className="h-11 rounded-xl border-[#D8E0E8] bg-white"
+                />
+                <Input
+                  type="date"
+                  value={agendamentoTo}
+                  onChange={(event) => setAgendamentoTo(event.target.value)}
+                  aria-label="Data final do agendamento"
+                  className="h-11 rounded-xl border-[#D8E0E8] bg-white"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -521,8 +471,8 @@ export default function AbaEmDesenvolvimento() {
             Lista unificada de cards
           </h2>
           <p className="mt-1 text-[13px] text-[#5C6B7A]">
-            Busque um card especifico, confira os dados consolidados e entre na
-            edicao operacional.
+            Busque um card especifico, visualize os dados consolidados ou edite
+            os campos financeiros permitidos.
           </p>
         </div>
 
@@ -563,10 +513,10 @@ export default function AbaEmDesenvolvimento() {
                     Responsavel
                   </TableHead>
                   <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Etapa
+                    Tipo de paciente
                   </TableHead>
                   <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Tipo
+                    Modalidade de pagamento
                   </TableHead>
                   <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Agendamento
@@ -586,6 +536,7 @@ export default function AbaEmDesenvolvimento() {
                 {paginatedCards.map((card) => {
                   const meta = FUNNEL_CARD_META[card.funnel];
                   const typeValue = getCardTypeValue(card);
+                  const parsedValue = parseMonetary(card.valor_atribuido);
 
                   return (
                     <TableRow key={card.id} className="border-[#EEF2F6]">
@@ -607,13 +558,13 @@ export default function AbaEmDesenvolvimento() {
                         </div>
                       </TableCell>
                       <TableCell className="text-[#40505F]">
-                        {card.responsavel || "—"}
+                        {card.responsavel || "-"}
                       </TableCell>
                       <TableCell className="text-[#40505F]">
-                        {card.etapa_no_crm || "—"}
+                        {typeValue || "-"}
                       </TableCell>
                       <TableCell className="text-[#40505F]">
-                        {typeValue || "—"}
+                        {card.modalidade_pagamento || "-"}
                       </TableCell>
                       <TableCell className="text-[#40505F]">
                         <div>
@@ -624,31 +575,51 @@ export default function AbaEmDesenvolvimento() {
                         </div>
                       </TableCell>
                       <TableCell className="font-medium text-[#0F1923]">
-                        {parseMonetary(card.valor_atribuido) > 0
-                          ? fmtBRL(parseMonetary(card.valor_atribuido))
-                          : "—"}
+                        {parsedValue > 0 ? fmtBRL(parsedValue) : "-"}
                       </TableCell>
                       <TableCell>
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                            card.data_pagamento
-                              ? "bg-[#ECFDF3] text-[#047857]"
-                              : "bg-[#FFF4E8] text-[#B45309]"
-                          }`}
-                        >
-                          {card.data_pagamento ? "Pago" : "Pendente"}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                              card.data_pagamento
+                                ? "bg-[#ECFDF3] text-[#047857]"
+                                : "bg-[#FFF4E8] text-[#B45309]"
+                            }`}
+                          >
+                            {card.data_pagamento ? "Pago" : "Pendente"}
+                          </span>
+                          <span className="text-[12px] text-[#7C8B99]">
+                            {card.data_pagamento || "Sem data"}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="pr-5 text-right">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-9 rounded-xl border-[#D8E0E8]"
-                          onClick={() => setSelectedCard(card)}
-                        >
-                          <SquarePen className="h-4 w-4" />
-                          Editar
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-xl border-[#D8E0E8]"
+                            onClick={() => {
+                              setSelectedCard(card);
+                              setSheetMode("view");
+                            }}
+                          >
+                            <Eye data-icon="inline-start" />
+                            Visualizar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-xl border-[#D8E0E8]"
+                            onClick={() => {
+                              setSelectedCard(card);
+                              setSheetMode("edit");
+                            }}
+                          >
+                            <SquarePen data-icon="inline-start" />
+                            Editar
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -658,7 +629,7 @@ export default function AbaEmDesenvolvimento() {
 
             <div className="flex flex-col gap-3 border-t border-[#E2E6EB] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-[13px] text-[#5C6B7A]">
-                Pagina {fmtNum(page)} de {fmtNum(totalPages)} ·{" "}
+                Pagina {fmtNum(page)} de {fmtNum(totalPages)} -{" "}
                 {fmtNum(filteredCards.length)} registros
               </p>
               <div className="flex items-center gap-2">
@@ -690,9 +661,13 @@ export default function AbaEmDesenvolvimento() {
 
       <CardEditorSheet
         card={selectedCard}
+        mode={sheetMode}
         open={Boolean(selectedCard)}
         onOpenChange={(open) => {
-          if (!open) setSelectedCard(null);
+          if (!open) {
+            setSelectedCard(null);
+            setSheetMode("view");
+          }
         }}
         onSave={async (draft) => {
           await updateMutation.mutateAsync(draft);
