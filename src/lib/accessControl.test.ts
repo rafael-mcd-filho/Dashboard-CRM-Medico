@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   getUserIdFromSearch,
   isLocalAdminCredentialsValid,
-  isLocalAdminLoginEnabled,
   isUserAuthorized,
   parseAllowedUserIds,
   resolveAccess,
@@ -36,14 +35,8 @@ describe("accessControl", () => {
     expect(isLocalAdminCredentialsValid("admin", "wrong")).toBe(false);
   });
 
-  it("enables local login on localhost", () => {
-    expect(isLocalAdminLoginEnabled("localhost", false)).toBe(true);
-    expect(isLocalAdminLoginEnabled("127.0.0.1", false)).toBe(true);
-    expect(isLocalAdminLoginEnabled("crm.exemplo.com", false)).toBe(false);
-  });
-
-  it("requires login locally when userid is missing", () => {
-    expect(resolveAccess({ search: "", hostname: "localhost", isDevelopment: false })).toEqual({
+  it("requires login when userid is missing", () => {
+    expect(resolveAccess({ search: "" })).toEqual({
       status: "login-required",
       userId: null,
     });
@@ -53,9 +46,7 @@ describe("accessControl", () => {
     expect(
       resolveAccess({
         search: "",
-        hostname: "localhost",
         hasLocalAdminAuth: true,
-        isDevelopment: false,
       })
     ).toEqual({
       status: "authorized",
@@ -68,10 +59,8 @@ describe("accessControl", () => {
     expect(
       resolveAccess({
         search: "?userid=invalido",
-        hostname: "localhost",
         hasLocalAdminAuth: true,
         userIds: new Set(["123"]),
-        isDevelopment: false,
       })
     ).toEqual({
       status: "denied",

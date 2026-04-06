@@ -38,14 +38,6 @@ export const isUserAuthorized = (
   userIds: ReadonlySet<string> = allowedUserIds
 ) => userId !== null && userIds.has(userId);
 
-export const isLocalHostname = (hostname?: string | null) =>
-  hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
-
-export const isLocalAdminLoginEnabled = (
-  hostname?: string | null,
-  isDevelopment = import.meta.env.DEV
-) => isDevelopment || isLocalHostname(hostname);
-
 export const isLocalAdminCredentialsValid = (username: string, password: string) =>
   username === LOCAL_ADMIN_USERNAME && password === LOCAL_ADMIN_PASSWORD;
 
@@ -58,10 +50,8 @@ export const persistLocalAdminSession = (storage?: Pick<Storage, "setItem"> | nu
 
 type ResolveAccessArgs = {
   search: string;
-  hostname?: string | null;
   hasLocalAdminAuth?: boolean;
   userIds?: ReadonlySet<string>;
-  isDevelopment?: boolean;
 };
 
 export type AccessResolution =
@@ -71,10 +61,8 @@ export type AccessResolution =
 
 export const resolveAccess = ({
   search,
-  hostname,
   hasLocalAdminAuth = false,
   userIds = allowedUserIds,
-  isDevelopment = import.meta.env.DEV,
 }: ResolveAccessArgs): AccessResolution => {
   const userId = getUserIdFromSearch(search);
 
@@ -84,11 +72,7 @@ export const resolveAccess = ({
       : { status: "denied", userId };
   }
 
-  if (isLocalAdminLoginEnabled(hostname, isDevelopment)) {
-    return hasLocalAdminAuth
-      ? { status: "authorized", userId: null, accessMode: "local-admin" }
-      : { status: "login-required", userId: null };
-  }
-
-  return { status: "denied", userId: null };
+  return hasLocalAdminAuth
+    ? { status: "authorized", userId: null, accessMode: "local-admin" }
+    : { status: "login-required", userId: null };
 };

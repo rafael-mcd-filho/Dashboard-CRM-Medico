@@ -21,7 +21,6 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   const access = resolveAccess({
     search: location.search,
-    hostname: typeof window !== "undefined" ? window.location.hostname : null,
     hasLocalAdminAuth,
   });
 
