@@ -10,6 +10,49 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
   const receivedCredential = userId ? `userid=${userId}` : "userid ausente";
   const isAccountDenied = mode === "account";
 
+  if (!isAccountDenied) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-[#F3F7FB] text-[#0F1923]">
+        <div className="absolute left-[-8rem] top-[-6rem] h-[26rem] w-[26rem] rounded-full bg-[rgba(185,28,28,0.14)] blur-3xl" />
+        <div className="absolute bottom-[-10rem] right-[-8rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(245,158,11,0.12)] blur-3xl" />
+        <div className="bg-dashboard-grid absolute inset-0 opacity-40" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(243,247,251,0.18),rgba(243,247,251,0.92))]" />
+
+        <div className="relative mx-auto flex min-h-screen max-w-4xl items-center justify-center px-6 py-8 md:px-10">
+          <section className="panel-shell animate-slide-up w-full max-w-3xl overflow-hidden border-white/85 bg-white/88 shadow-[0_35px_120px_rgba(15,25,35,0.12)] backdrop-blur-xl">
+            <div className="h-px bg-gradient-to-r from-[#B42318] via-[#F59E0B] to-transparent" />
+            <div className="flex flex-col items-center gap-8 px-8 py-12 text-center md:px-14 md:py-16">
+              <div className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-[#F4D7D7] bg-[#FFF1F1] text-[#B42318] shadow-sm">
+                <Ban className="h-7 w-7" aria-hidden="true" />
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C07E6A]">
+                  Acesso restrito
+                </p>
+                <h1 className="mx-auto max-w-2xl text-[2.5rem] font-semibold leading-[1.02] tracking-[-0.05em] md:text-[3.2rem]">
+                  Voce nao tem permissao para acessar esta aba.
+                </h1>
+                <p className="mx-auto max-w-xl text-[15px] leading-8 text-[#5C6B7A] md:text-[16px]">
+                  Se voce acredita que isso e um engano, contacte o administrador do CRM.
+                </p>
+              </div>
+
+              <div className="rounded-[22px] border border-[#F0E4E0] bg-[#FFF8F5] px-5 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C07E6A]">
+                  Credencial recebida
+                </p>
+                <p className="mt-3 break-all font-mono text-sm leading-7 text-[#7A2E1F]">
+                  {receivedCredential}
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   const title = isAccountDenied
     ? userId
       ? "Sua conta nao possui permissao para este acesso."
