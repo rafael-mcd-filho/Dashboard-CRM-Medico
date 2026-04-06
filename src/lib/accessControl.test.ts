@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   getUserIdFromSearch,
-  isLocalAdminCredentialsValid,
+  isRecognizedUserId,
   isUserAuthorized,
   parseAllowedUserIds,
-  resolveAccess,
 } from "./accessControl";
 
 describe("accessControl", () => {
@@ -30,41 +29,11 @@ describe("accessControl", () => {
     expect(isUserAuthorized(null, userIds)).toBe(false);
   });
 
-  it("accepts the local admin test credentials", () => {
-    expect(isLocalAdminCredentialsValid("admin", "admin")).toBe(true);
-    expect(isLocalAdminCredentialsValid("admin", "wrong")).toBe(false);
-  });
+  it("accepts null user ids and recognized ids only", () => {
+    const userIds = new Set(["123", "456"]);
 
-  it("requires login when userid is missing", () => {
-    expect(resolveAccess({ search: "" })).toEqual({
-      status: "login-required",
-      userId: null,
-    });
-  });
-
-  it("authorizes the local admin session when userid is missing", () => {
-    expect(
-      resolveAccess({
-        search: "",
-        hasLocalAdminAuth: true,
-      })
-    ).toEqual({
-      status: "authorized",
-      userId: null,
-      accessMode: "local-admin",
-    });
-  });
-
-  it("keeps denying an explicit invalid userid", () => {
-    expect(
-      resolveAccess({
-        search: "?userid=invalido",
-        hasLocalAdminAuth: true,
-        userIds: new Set(["123"]),
-      })
-    ).toEqual({
-      status: "denied",
-      userId: "invalido",
-    });
+    expect(isRecognizedUserId(null, userIds)).toBe(true);
+    expect(isRecognizedUserId("123", userIds)).toBe(true);
+    expect(isRecognizedUserId("999", userIds)).toBe(false);
   });
 });

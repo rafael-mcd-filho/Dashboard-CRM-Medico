@@ -3,22 +3,50 @@ import AccessShell from "@/components/auth/AccessShell";
 
 type AccessDeniedProps = {
   userId: string | null;
+  mode?: "userid" | "account";
 };
 
-const AccessDenied = ({ userId }: AccessDeniedProps) => {
+const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
   const receivedCredential = userId ? `userid=${userId}` : "userid ausente";
+  const isAccountDenied = mode === "account";
+
+  const title = isAccountDenied
+    ? userId
+      ? "Sua conta nao possui permissao para este acesso."
+      : "Sua conta ainda nao possui permissao para acessar o dashboard."
+    : "Este usuario nao esta liberado para acessar o dashboard.";
+
+  const description = isAccountDenied
+    ? userId
+      ? "A autenticacao foi concluida, mas a conta atual nao possui vinculo ativo com o userid informado. Se isso estiver incorreto, solicite a revisao do acesso ao administrador do CRM."
+      : "A autenticacao foi concluida, mas nenhuma permissao ativa foi encontrada para a conta atual. Solicite a liberacao ao administrador do CRM."
+    : "O conteudo deste painel e exibido apenas para usuarios previamente autorizados. Se voce recebeu este link e acredita que o bloqueio e indevido, valide o userid informado e contate o administrador do CRM.";
+
+  const statusText = isAccountDenied
+    ? "Autenticacao concluida, mas sem permissao ativa para este painel."
+    : "Acesso negado para a credencial informada.";
+
+  const actionText = isAccountDenied
+    ? "Solicite a associacao da sua conta com o acesso correto no CRM."
+    : "Solicite a liberacao do seu usuario junto ao administrador do CRM.";
+
+  const detailText = isAccountDenied
+    ? userId
+      ? "A conta autenticada nao possui vinculo com o userid solicitado."
+      : "Nenhuma permissao ativa foi localizada para a conta autenticada."
+    : "O painel reconheceu a requisicao, mas o usuario nao faz parte da allowlist atual.";
 
   return (
     <AccessShell
       eyebrow="Acesso restrito"
       icon={ShieldX}
       tone="rose"
-      title="Este usuario nao esta liberado para acessar o dashboard."
-      description="O conteudo deste painel e exibido apenas para usuarios previamente autorizados. Se voce recebeu este link e acredita que o bloqueio e indevido, valide o userid informado e contate o administrador do CRM."
+      title={title}
+      description={description}
       highlights={[
         {
           label: "Status",
-          value: "Acesso negado para a credencial informada.",
+          value: statusText,
         },
         {
           label: "Parametro",
@@ -26,7 +54,7 @@ const AccessDenied = ({ userId }: AccessDeniedProps) => {
         },
         {
           label: "Acao",
-          value: "Solicite a liberacao do seu usuario junto ao administrador do CRM.",
+          value: actionText,
         },
       ]}
     >
@@ -44,7 +72,7 @@ const AccessDenied = ({ userId }: AccessDeniedProps) => {
                 Permissao nao encontrada
               </h2>
               <p className="max-w-sm text-sm leading-7 text-[#6A5B58]">
-                O painel reconheceu a requisicao, mas o usuario nao faz parte da allowlist atual.
+                {detailText}
               </p>
             </div>
           </div>
@@ -69,8 +97,8 @@ const AccessDenied = ({ userId }: AccessDeniedProps) => {
                 <p className="text-sm font-semibold text-[#0F1923]">O que verificar agora</p>
                 <div className="space-y-2 text-sm leading-7 text-[#5C6B7A]">
                   <p>Confirme se o link foi aberto com o <span className="font-mono">userid</span> correto.</p>
-                  <p>Se o identificador estiver certo, solicite a liberacao com o administrador do CRM.</p>
-                  <p>Se o acesso era esperado, revise a allowlist configurada no deploy.</p>
+                  <p>Verifique se a conta autenticada esta vinculada ao acesso esperado.</p>
+                  <p>Se o bloqueio nao era esperado, revise as permissoes configuradas no CRM.</p>
                 </div>
               </div>
             </div>

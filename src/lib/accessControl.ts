@@ -1,7 +1,4 @@
 export const USER_ID_QUERY_PARAM = "userid";
-export const LOCAL_ADMIN_SESSION_KEY = "crm-local-admin-auth";
-export const LOCAL_ADMIN_USERNAME = "admin";
-export const LOCAL_ADMIN_PASSWORD = "admin";
 
 // Troque os IDs abaixo ou defina VITE_ALLOWED_USER_IDS=123,456 no ambiente.
 const FALLBACK_ALLOWED_USER_IDS = [
@@ -38,41 +35,7 @@ export const isUserAuthorized = (
   userIds: ReadonlySet<string> = allowedUserIds
 ) => userId !== null && userIds.has(userId);
 
-export const isLocalAdminCredentialsValid = (username: string, password: string) =>
-  username === LOCAL_ADMIN_USERNAME && password === LOCAL_ADMIN_PASSWORD;
-
-export const hasLocalAdminSession = (storage?: Pick<Storage, "getItem"> | null) =>
-  storage?.getItem(LOCAL_ADMIN_SESSION_KEY) === "true";
-
-export const persistLocalAdminSession = (storage?: Pick<Storage, "setItem"> | null) => {
-  storage?.setItem(LOCAL_ADMIN_SESSION_KEY, "true");
-};
-
-type ResolveAccessArgs = {
-  search: string;
-  hasLocalAdminAuth?: boolean;
-  userIds?: ReadonlySet<string>;
-};
-
-export type AccessResolution =
-  | { status: "authorized"; userId: string | null; accessMode: "userid" | "local-admin" }
-  | { status: "login-required"; userId: null }
-  | { status: "denied"; userId: string | null };
-
-export const resolveAccess = ({
-  search,
-  hasLocalAdminAuth = false,
-  userIds = allowedUserIds,
-}: ResolveAccessArgs): AccessResolution => {
-  const userId = getUserIdFromSearch(search);
-
-  if (userId !== null) {
-    return isUserAuthorized(userId, userIds)
-      ? { status: "authorized", userId, accessMode: "userid" }
-      : { status: "denied", userId };
-  }
-
-  return hasLocalAdminAuth
-    ? { status: "authorized", userId: null, accessMode: "local-admin" }
-    : { status: "login-required", userId: null };
-};
+export const isRecognizedUserId = (
+  userId: string | null,
+  userIds: ReadonlySet<string> = allowedUserIds
+) => userId === null || userIds.has(userId);

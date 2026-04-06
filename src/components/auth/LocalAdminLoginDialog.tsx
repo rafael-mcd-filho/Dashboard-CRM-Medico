@@ -1,31 +1,28 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { LockKeyhole, ShieldCheck } from "lucide-react";
+import { LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
 import AccessShell from "@/components/auth/AccessShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isLocalAdminCredentialsValid } from "@/lib/accessControl";
 
 type LocalAdminLoginDialogProps = {
-  onAuthenticated: () => void;
+  onSubmit: (credentials: { email: string; password: string }) => Promise<void>;
+  errorMessage: string | null;
+  isSubmitting: boolean;
 };
 
-const LocalAdminLoginDialog = ({ onAuthenticated }: LocalAdminLoginDialogProps) => {
-  const [username, setUsername] = useState("");
+const LocalAdminLoginDialog = ({
+  onSubmit,
+  errorMessage,
+  isSubmitting,
+}: LocalAdminLoginDialogProps) => {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!isLocalAdminCredentialsValid(username.trim(), password)) {
-      setErrorMessage("Usuario ou senha invalidos.");
-      return;
-    }
-
-    setErrorMessage(null);
-    onAuthenticated();
+    await onSubmit({ email: email.trim(), password });
   };
 
   return (
@@ -79,25 +76,26 @@ const LocalAdminLoginDialog = ({ onAuthenticated }: LocalAdminLoginDialogProps) 
         <div className="space-y-6 px-7 py-7">
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label className="text-[#314356]" htmlFor="local-admin-username">Usuario</Label>
-              <Input
-                id="local-admin-username"
-                autoComplete="username"
-                autoFocus
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="Digite seu usuario"
-                className="h-12 rounded-[18px] border-[#D8E2EE] bg-[#F8FBFD] px-4 shadow-none focus-visible:ring-clinic-blue"
-              />
-            </div>
+                <Label className="text-[#314356]" htmlFor="dashboard-login-email">Email</Label>
+                <Input
+                  id="dashboard-login-email"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="voce@empresa.com"
+                  className="h-12 rounded-[18px] border-[#D8E2EE] bg-[#F8FBFD] px-4 shadow-none focus-visible:ring-clinic-blue"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label className="text-[#314356]" htmlFor="local-admin-password">Senha</Label>
-              <Input
-                id="local-admin-password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
+              <div className="space-y-2">
+                <Label className="text-[#314356]" htmlFor="dashboard-login-password">Senha</Label>
+                <Input
+                  id="dashboard-login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Digite sua senha"
                 className="h-12 rounded-[18px] border-[#D8E2EE] bg-[#F8FBFD] px-4 shadow-none focus-visible:ring-clinic-blue"
@@ -110,8 +108,19 @@ const LocalAdminLoginDialog = ({ onAuthenticated }: LocalAdminLoginDialogProps) 
               </p>
             ) : null}
 
-            <Button className="h-12 w-full rounded-[18px] bg-[#1A56DB] text-white shadow-[0_16px_36px_rgba(26,86,219,0.28)] hover:bg-[#164CC3]" type="submit">
-              Entrar
+            <Button
+              className="h-12 w-full rounded-[18px] bg-[#1A56DB] text-white shadow-[0_16px_36px_rgba(26,86,219,0.28)] hover:bg-[#164CC3]"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Validando acesso
+                </>
+              ) : (
+                "Entrar"
+              )}
             </Button>
           </form>
 

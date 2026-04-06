@@ -44,6 +44,30 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_access: {
+        Row: {
+          active: boolean
+          auth_user_id: string
+          created_at: string
+          external_userid: string
+          id: number
+        }
+        Insert: {
+          active?: boolean
+          auth_user_id: string
+          created_at?: string
+          external_userid: string
+          id?: never
+        }
+        Update: {
+          active?: boolean
+          auth_user_id?: string
+          created_at?: string
+          external_userid?: string
+          id?: never
+        }
+        Relationships: []
+      }
       broncoscopia: {
         Row: {
           contato_id: string | null
