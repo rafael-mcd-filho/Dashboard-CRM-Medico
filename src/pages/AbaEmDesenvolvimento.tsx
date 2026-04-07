@@ -40,12 +40,22 @@ import { parseBRDate, parseMonetary } from "@/lib/parse";
 
 const PAGE_SIZE = 25;
 
+const ETAPAS_EXCLUIDAS_AGENDAMENTO = new Set([
+  "captacao",
+  "negociacao",
+  "perdido",
+]);
+
 function normalizeSearch(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function normalizeStage(value: string | null | undefined) {
+  return normalizeSearch(value ?? "");
 }
 
 function emptyToNull(value: string) {
@@ -135,6 +145,9 @@ export default function AbaEmDesenvolvimento() {
   const [paymentFilter, setPaymentFilter] = useState<
     "all" | "paid" | "unpaid"
   >("all");
+  const [baseFilter, setBaseFilter] = useState<"scheduled" | "all">(
+    "scheduled"
+  );
   const [search, setSearch] = useState("");
   const [agendamentoFrom, setAgendamentoFrom] = useState("");
   const [agendamentoTo, setAgendamentoTo] = useState("");
@@ -171,6 +184,13 @@ export default function AbaEmDesenvolvimento() {
         return false;
       }
 
+      if (
+        baseFilter === "scheduled" &&
+        ETAPAS_EXCLUIDAS_AGENDAMENTO.has(normalizeStage(card.etapa_no_crm))
+      ) {
+        return false;
+      }
+
       if (paymentFilter === "paid" && !card.data_pagamento) {
         return false;
       }
@@ -203,6 +223,7 @@ export default function AbaEmDesenvolvimento() {
   }, [
     agendamentoFrom,
     agendamentoTo,
+    baseFilter,
     deferredSearch,
     funnelScopedCards,
     paymentFilter,
@@ -223,6 +244,7 @@ export default function AbaEmDesenvolvimento() {
     funnelFilter,
     responsavelFilter,
     paymentFilter,
+    baseFilter,
     deferredSearch,
     agendamentoFrom,
     agendamentoTo,
@@ -335,7 +357,7 @@ export default function AbaEmDesenvolvimento() {
             </h2>
           </div>
 
-          <div className="grid items-end gap-3 xl:grid-cols-[minmax(280px,1.6fr)_repeat(3,minmax(180px,1fr))_auto]">
+          <div className="grid items-end gap-3 xl:grid-cols-[minmax(260px,1.4fr)_repeat(4,minmax(150px,0.8fr))_auto]">
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
                 Busca
@@ -371,6 +393,26 @@ export default function AbaEmDesenvolvimento() {
                       {FUNNEL_CARD_META[key].label}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
+                Base
+              </span>
+              <Select
+                value={baseFilter}
+                onValueChange={(value) =>
+                  setBaseFilter(value as "scheduled" | "all")
+                }
+              >
+                <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
+                  <SelectValue placeholder="Base" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[280px]">
+                  <SelectItem value="scheduled">Base agendada</SelectItem>
+                  <SelectItem value="all">Todos os cards</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -423,6 +465,7 @@ export default function AbaEmDesenvolvimento() {
                 setFunnelFilter("all");
                 setResponsavelFilter("__all__");
                 setPaymentFilter("all");
+                setBaseFilter("scheduled");
                 setSearch("");
                 setAgendamentoFrom("");
                 setAgendamentoTo("");
@@ -440,7 +483,8 @@ export default function AbaEmDesenvolvimento() {
                 </p>
                 <p className="mt-1 text-[12px] text-[#5C6B7A]">
                   Filtra cards cuja data de agendamento esteja entre a data
-                  inicial e a data final informadas.
+                  inicial e a data final informadas. Com a base agendada ativa,
+                  Captação, Negociação e Perdido ficam fora da lista.
                 </p>
               </div>
 

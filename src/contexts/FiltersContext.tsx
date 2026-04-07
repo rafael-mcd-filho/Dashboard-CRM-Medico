@@ -4,6 +4,7 @@ import {
   endOfDay,
   endOfMonth,
   endOfWeek,
+  endOfYear,
   startOfDay,
   startOfMonth,
   startOfWeek,
@@ -78,7 +79,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   const now = new Date();
   const [filters, setFiltersState] = useState<FiltersState>({
     dataInicio: startOfMonth(now),
-    dataFim: endOfDay(now),
+    dataFim: endOfMonth(now),
     atalho: "este_mes",
     tipoData: "criacao",
     responsavel: "",
@@ -221,7 +222,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         break;
       case "esta_semana":
         dataInicio = startOfWeek(today, { weekStartsOn: 1 });
-        dataFim = endOfDay(today);
+        dataFim = endOfWeek(today, { weekStartsOn: 1 });
         break;
       case "semana_anterior": {
         const reference = subWeeks(today, 1);
@@ -231,7 +232,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       }
       case "este_mes":
         dataInicio = startOfMonth(today);
-        dataFim = endOfDay(today);
+        dataFim = endOfMonth(today);
         break;
       case "mes_anterior": {
         const reference = subMonths(today, 1);
@@ -241,7 +242,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       }
       case "este_ano":
         dataInicio = startOfYear(today);
-        dataFim = endOfDay(today);
+        dataFim = endOfYear(today);
         break;
       case "todo_periodo":
         if (!allPeriodRange) {
