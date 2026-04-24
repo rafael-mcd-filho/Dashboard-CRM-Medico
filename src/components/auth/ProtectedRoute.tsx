@@ -48,14 +48,8 @@ const ProtectedRoute = ({
         return;
       }
 
-      if (requestedUserId && allowRecognizedUserIdAccess) {
-        if (!ignore) {
-          setLoginError(null);
-          setAccess({ status: "authorized" });
-        }
-        return;
-      }
-
+      // A recognized `userid` only scopes the request. Supabase RLS still
+      // requires an authenticated session before any dashboard data can load.
       const {
         data: { session },
         error: sessionError,
