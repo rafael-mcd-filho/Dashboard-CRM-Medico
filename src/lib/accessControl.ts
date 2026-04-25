@@ -1,4 +1,5 @@
 export const USER_ID_QUERY_PARAM = "userid";
+export const DASHBOARD_USER_ID_HEADER = "x-dashboard-userid";
 
 // Troque os IDs abaixo ou defina VITE_ALLOWED_USER_IDS=123,456 no ambiente.
 const FALLBACK_ALLOWED_USER_IDS = [
@@ -28,6 +29,15 @@ export const getUserIdFromSearch = (search: string) => {
   const rawValue = params.get(USER_ID_QUERY_PARAM)?.trim();
 
   return rawValue ? rawValue : null;
+};
+
+export const getAuthorizedUserIdFromSearch = (
+  search: string,
+  userIds: ReadonlySet<string> = allowedUserIds
+) => {
+  const userId = getUserIdFromSearch(search);
+
+  return userId !== null && userIds.has(userId) ? userId : null;
 };
 
 export const isUserAuthorized = (

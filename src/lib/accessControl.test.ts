@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getAuthorizedUserIdFromSearch,
   getUserIdFromSearch,
   isRecognizedUserId,
   isUserAuthorized,
@@ -15,6 +16,14 @@ describe("accessControl", () => {
   it("returns null when userid is missing or blank", () => {
     expect(getUserIdFromSearch("")).toBeNull();
     expect(getUserIdFromSearch("?userid=   ")).toBeNull();
+  });
+
+  it("returns the userid only when it is explicitly allowed", () => {
+    const userIds = new Set(["123", "456"]);
+
+    expect(getAuthorizedUserIdFromSearch("?userid=123", userIds)).toBe("123");
+    expect(getAuthorizedUserIdFromSearch("?userid=999", userIds)).toBeNull();
+    expect(getAuthorizedUserIdFromSearch("", userIds)).toBeNull();
   });
 
   it("normalizes the configured allowlist", () => {

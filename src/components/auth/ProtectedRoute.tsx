@@ -5,7 +5,11 @@ import AccessConfigurationError from "@/components/auth/AccessConfigurationError
 import AccessLoading from "@/components/auth/AccessLoading";
 import AccessDenied from "@/pages/AccessDenied";
 import LocalAdminLoginDialog from "@/components/auth/LocalAdminLoginDialog";
-import { getUserIdFromSearch, isRecognizedUserId } from "@/lib/accessControl";
+import {
+  getAuthorizedUserIdFromSearch,
+  getUserIdFromSearch,
+  isRecognizedUserId,
+} from "@/lib/accessControl";
 import { supabase } from "@/integrations/supabase/client";
 
 type ProtectedRouteProps = {
@@ -40,6 +44,7 @@ const ProtectedRoute = ({
       setAccess({ status: "loading" });
 
       const requestedUserId = getUserIdFromSearch(location.search);
+      const authorizedUserId = getAuthorizedUserIdFromSearch(location.search);
 
       if (!isRecognizedUserId(requestedUserId)) {
         if (!ignore) {
@@ -48,8 +53,16 @@ const ProtectedRoute = ({
         return;
       }
 
-      // A recognized `userid` only scopes the request. Supabase RLS still
-      // requires an authenticated session before any dashboard data can load.
+      if (allowRecognizedUserIdAccess && authorizedUserId) {
+        if (!ignore) {
+          setLoginError(null);
+          setAccess({ status: "authorized" });
+        }
+        return;
+      }
+
+      // Without a recognized public `userid`, the dashboard still depends on
+      // a Supabase session plus the authenticated account permission mapping.
       const {
         data: { session },
         error: sessionError,
