@@ -91,9 +91,11 @@ export type Database = {
       }
       broncoscopia: {
         Row: {
+          comissoes: string | null
           contato_id: string | null
           created_at: string
           custo: string | null
+          custos_exame: string | null
           data_agendamento: string | null
           data_atualizacao_card: string | null
           data_atualizacao_conversa: string | null
@@ -106,6 +108,7 @@ export type Database = {
           horario_agendamento: string | null
           id: string
           id_do_card: string | null
+          impostos: string | null
           key: string
           link_da_conversa: string | null
           modalidade_pagamento: string | null
@@ -118,9 +121,11 @@ export type Database = {
           valor_atribuido: string | null
         }
         Insert: {
+          comissoes?: string | null
           contato_id?: string | null
           created_at?: string
           custo?: string | null
+          custos_exame?: string | null
           data_agendamento?: string | null
           data_atualizacao_card?: string | null
           data_atualizacao_conversa?: string | null
@@ -133,6 +138,7 @@ export type Database = {
           horario_agendamento?: string | null
           id?: string
           id_do_card?: string | null
+          impostos?: string | null
           key: string
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
@@ -145,9 +151,11 @@ export type Database = {
           valor_atribuido?: string | null
         }
         Update: {
+          comissoes?: string | null
           contato_id?: string | null
           created_at?: string
           custo?: string | null
+          custos_exame?: string | null
           data_agendamento?: string | null
           data_atualizacao_card?: string | null
           data_atualizacao_conversa?: string | null
@@ -160,6 +168,7 @@ export type Database = {
           horario_agendamento?: string | null
           id?: string
           id_do_card?: string | null
+          impostos?: string | null
           key?: string
           link_da_conversa?: string | null
           modalidade_pagamento?: string | null
@@ -349,6 +358,7 @@ export type Database = {
           impostos: string | null
           key: string
           link_da_conversa: string | null
+          medico_auxiliar: string | null
           modalidade_pagamento: string | null
           nome_contato: string | null
           responsavel: string | null
@@ -380,6 +390,7 @@ export type Database = {
           impostos?: string | null
           key: string
           link_da_conversa?: string | null
+          medico_auxiliar?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
           responsavel?: string | null
@@ -411,6 +422,7 @@ export type Database = {
           impostos?: string | null
           key?: string
           link_da_conversa?: string | null
+          medico_auxiliar?: string | null
           modalidade_pagamento?: string | null
           nome_contato?: string | null
           responsavel?: string | null

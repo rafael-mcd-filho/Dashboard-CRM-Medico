@@ -24,6 +24,7 @@ import {
   type FunnelCardDraft,
   type UnifiedFunnelCard,
 } from "@/lib/funnelCards";
+import { cn } from "@/lib/utils";
 
 type CardEditorSheetMode = "view" | "edit";
 
@@ -40,14 +41,28 @@ type CardEditorSheetProps = {
 function Field({
   label,
   children,
+  tone = "readonly",
 }: {
   label: string;
   children: ReactNode;
+  tone?: "readonly" | "editable";
 }) {
+  const isEditable = tone === "editable";
+
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
-        {label}
+      <span
+        className={cn(
+          "flex min-h-5 items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.12em]",
+          isEditable ? "text-clinic-blue" : "text-[#8A97A6]"
+        )}
+      >
+        <span>{label}</span>
+        {isEditable ? (
+          <span className="rounded-full border border-[#BFD6FF] bg-[#EEF5FF] px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-clinic-blue">
+            Editável
+          </span>
+        ) : null}
       </span>
       {children}
     </label>
@@ -59,12 +74,24 @@ function ReadonlyInput({ value }: { value: string }) {
     <Input
       value={value}
       readOnly
-      className="h-11 rounded-xl border-[#D8E0E8] bg-[#F7F9FB] text-[#40505F]"
+      className="h-11 cursor-default rounded-xl border-[#D8E0E8] bg-[#F4F7FA] text-[#40505F] shadow-inner shadow-[#EAF0F6]/50"
     />
   );
 }
 
-function emptyLabel(value: string | null | undefined, fallback = "Nao informado") {
+const editableInputClass =
+  "h-11 rounded-xl border-[#77A7F8] bg-[#F7FBFF] text-[#0F1923] shadow-[0_0_0_3px_rgba(26,86,219,0.10)] focus-visible:ring-clinic-blue";
+
+const readonlyInputClass =
+  "h-11 cursor-default rounded-xl border-[#D8E0E8] bg-[#F4F7FA] text-[#40505F] shadow-inner shadow-[#EAF0F6]/50";
+
+const editableTextareaClass =
+  "min-h-[152px] rounded-2xl border-[#77A7F8] bg-[#F7FBFF] text-[#0F1923] shadow-[0_0_0_3px_rgba(26,86,219,0.10)] focus-visible:ring-clinic-blue";
+
+const readonlyTextareaClass =
+  "min-h-[152px] cursor-default rounded-2xl border-[#D8E0E8] bg-[#F4F7FA] text-[#40505F] shadow-inner shadow-[#EAF0F6]/50";
+
+function emptyLabel(value: string | null | undefined, fallback = "Não informado") {
   const trimmed = value?.trim();
   return trimmed ? trimmed : fallback;
 }
@@ -134,9 +161,9 @@ export function CardEditorSheet({
             </SheetTitle>
             <SheetDescription className="max-w-[60ch] text-[13px] leading-6 text-[#5C6B7A]">
               {isEditMode
-                ? "Somente data de pagamento, valor, forma de pagamento e descricao podem ser alterados nesta tela."
+                ? "Somente data de pagamento, valor, forma de pagamento e descrição podem ser alterados nesta tela."
                 : canEdit
-                  ? "Consulte os dados consolidados do card. Para ajustes, use a acao de editar."
+                  ? "Consulte os dados consolidados do card. Para ajustes, use a ação de editar."
                   : "Seu acesso permite apenas visualizar os dados consolidados do card."}
             </SheetDescription>
           </SheetHeader>
@@ -160,10 +187,10 @@ export function CardEditorSheet({
                   Agendamento
                 </p>
                 <p className="mt-3 text-base font-semibold text-[#0F1923]">
-                  {emptyLabel(card.data_agendamento, "Nao agendado")}
+                  {emptyLabel(card.data_agendamento, "Não agendado")}
                 </p>
                 <p className="mt-1 text-[12px] text-[#5C6B7A]">
-                  {emptyLabel(card.horario_agendamento, "Sem horario")}
+                  {emptyLabel(card.horario_agendamento, "Sem horário")}
                 </p>
               </div>
 
@@ -187,7 +214,7 @@ export function CardEditorSheet({
                 </h3>
                 <p className="mt-1 text-[13px] text-[#5C6B7A]">
                   {canEdit
-                    ? "Os campos abaixo servem para consulta operacional. Apenas os campos de pagamento, valor, forma de pagamento e descricao podem ser alterados."
+                    ? "Os campos abaixo servem para consulta operacional. Apenas os campos destacados podem ser alterados."
                     : "Os campos abaixo servem para consulta operacional em modo somente leitura."}
                 </p>
               </div>
@@ -199,31 +226,31 @@ export function CardEditorSheet({
                 <Field label="Contato">
                   <ReadonlyInput value={emptyLabel(draft.nome_contato, "Sem nome")} />
                 </Field>
-                <Field label="Responsavel">
+                <Field label="Responsável">
                   <ReadonlyInput
-                    value={emptyLabel(draft.responsavel, "Nao informado")}
+                    value={emptyLabel(draft.responsavel, "Não informado")}
                   />
                 </Field>
                 <Field label="Tipo de paciente">
-                  <ReadonlyInput value={emptyLabel(typeValue, "Nao informado")} />
+                  <ReadonlyInput value={emptyLabel(typeValue, "Não informado")} />
                 </Field>
                 <Field label="Modalidade de pagamento">
                   <ReadonlyInput
                     value={emptyLabel(
                       draft.modalidade_pagamento,
-                      "Nao informada"
+                      "Não informada"
                     )}
                   />
                 </Field>
                 <Field label="Agendamento">
                   <ReadonlyInput
                     value={[
-                      emptyLabel(draft.data_agendamento, "Nao agendado"),
-                      emptyLabel(draft.horario_agendamento, "Sem horario"),
+                      emptyLabel(draft.data_agendamento, "Não agendado"),
+                      emptyLabel(draft.horario_agendamento, "Sem horário"),
                     ].join("  |  ")}
                   />
                 </Field>
-                <Field label="Data de pagamento">
+                <Field label="Data de pagamento" tone={isEditMode ? "editable" : "readonly"}>
                   <Input
                     value={draft.data_pagamento}
                     onChange={(event) =>
@@ -231,12 +258,10 @@ export function CardEditorSheet({
                     }
                     readOnly={!isEditMode}
                     placeholder="DD/MM/AAAA"
-                    className={`h-11 rounded-xl border-[#D8E0E8] ${
-                      isEditMode ? "bg-white" : "bg-[#F7F9FB] text-[#40505F]"
-                    }`}
+                    className={isEditMode ? editableInputClass : readonlyInputClass}
                   />
                 </Field>
-                <Field label="Valor">
+                <Field label="Valor" tone={isEditMode ? "editable" : "readonly"}>
                   <Input
                     value={draft.valor_atribuido}
                     onChange={(event) =>
@@ -244,12 +269,10 @@ export function CardEditorSheet({
                     }
                     readOnly={!isEditMode}
                     placeholder="Ex.: 1500 ou R$ 1.500,00"
-                    className={`h-11 rounded-xl border-[#D8E0E8] ${
-                      isEditMode ? "bg-white" : "bg-[#F7F9FB] text-[#40505F]"
-                    }`}
+                    className={isEditMode ? editableInputClass : readonlyInputClass}
                   />
                 </Field>
-                <Field label="Forma de pagamento">
+                <Field label="Forma de pagamento" tone={isEditMode ? "editable" : "readonly"}>
                   {isEditMode ? (
                     <Select
                       value={draft.forma_pagamento || "__empty__"}
@@ -260,11 +283,11 @@ export function CardEditorSheet({
                         )
                       }
                     >
-                      <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8] bg-white">
-                        <SelectValue placeholder="Nao informado" />
+                      <SelectTrigger className={editableInputClass}>
+                        <SelectValue placeholder="Não informado" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__empty__">Nao informado</SelectItem>
+                        <SelectItem value="__empty__">Não informado</SelectItem>
                         <SelectItem value="PIX">PIX</SelectItem>
                         <SelectItem value="Cartão">Cartão</SelectItem>
                         <SelectItem value="Dinheiro">Dinheiro</SelectItem>
@@ -272,7 +295,7 @@ export function CardEditorSheet({
                     </Select>
                   ) : (
                     <ReadonlyInput
-                      value={emptyLabel(draft.forma_pagamento, "Nao informado")}
+                      value={emptyLabel(draft.forma_pagamento, "Não informado")}
                     />
                   )}
                 </Field>
@@ -281,7 +304,7 @@ export function CardEditorSheet({
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <Field label="Link da conversa">
                   <ReadonlyInput
-                    value={emptyLabel(draft.link_da_conversa, "Nao informado")}
+                    value={emptyLabel(draft.link_da_conversa, "Não informado")}
                   />
                 </Field>
                 <Field label="Tabela de origem">
@@ -290,23 +313,23 @@ export function CardEditorSheet({
               </div>
 
               <div className="mt-4">
-                <Field label="Descricao">
+                <Field label="Descrição" tone={isEditMode ? "editable" : "readonly"}>
                   <Textarea
                     value={draft.descricao_card}
                     onChange={(event) =>
                       updateField("descricao_card", event.target.value)
                     }
                     readOnly={!isEditMode}
-                    className={`min-h-[152px] rounded-2xl border-[#D8E0E8] ${
-                      isEditMode ? "bg-white" : "bg-[#F7F9FB] text-[#40505F]"
-                    }`}
+                    className={
+                      isEditMode ? editableTextareaClass : readonlyTextareaClass
+                    }
                   />
                 </Field>
               </div>
 
               {!isEditMode ? (
                 <div className="mt-4 rounded-2xl border border-[#E6ECF2] bg-[#FAFBFC] px-4 py-3 text-[13px] text-[#5C6B7A]">
-                  Esta visualizacao e somente leitura.
+                  Esta visualização é somente leitura.
                 </div>
               ) : null}
             </section>
@@ -351,7 +374,7 @@ export function CardEditorSheet({
                     disabled={isSaving}
                   >
                     <Save data-icon="inline-start" />
-                    {isSaving ? "Salvando..." : "Salvar alteracoes"}
+                    {isSaving ? "Salvando..." : "Salvar alterações"}
                   </Button>
                 ) : null}
               </div>

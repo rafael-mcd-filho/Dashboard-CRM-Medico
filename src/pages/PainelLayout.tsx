@@ -7,6 +7,7 @@ const PainelLayout = () => {
   const location = useLocation();
   const hidesGlobalFilters =
     location.pathname.startsWith("/agenda") ||
+    location.pathname.startsWith("/operacional") ||
     location.pathname.startsWith("/em-desenvolvimento");
 
   return (

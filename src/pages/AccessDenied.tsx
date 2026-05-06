@@ -61,7 +61,7 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
   }
 
   const title = isOperationsDenied
-    ? "Sua conta nao possui permissao para a central operacional."
+    ? "Sua conta nao possui permissao para o Operacional."
     : isAccountDenied
     ? userId
       ? "Sua conta nao possui permissao para este acesso."
@@ -69,7 +69,7 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
     : "Voce nao tem permissao para acessar esta aba.";
 
   const description = isOperationsDenied
-    ? "A autenticacao foi concluida, mas este email nao esta liberado para a aba em desenvolvimento. Solicite a revisao do acesso ao administrador do CRM."
+    ? "A autenticacao foi concluida, mas este email nao esta liberado para o Operacional. Solicite a revisao do acesso ao administrador do CRM."
     : isAccountDenied
     ? userId
       ? "A autenticacao foi concluida, mas a conta atual nao possui vinculo ativo com o userid informado. Se isso estiver incorreto, solicite a revisao do acesso ao administrador do CRM."
@@ -77,7 +77,7 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
     : "Se voce acredita que isso e um engano, contacte o administrador do CRM.";
 
   const statusText = isOperationsDenied
-    ? "Autenticacao concluida, mas sem permissao ativa para a central operacional."
+    ? "Autenticacao concluida, mas sem permissao ativa para o Operacional."
     : isAccountDenied
     ? "Autenticacao concluida, mas sem permissao ativa para este painel."
     : "Acesso negado.";
@@ -160,7 +160,7 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
                     <>
                       <p>Confirme se voce entrou com o email correto.</p>
                       <p>Verifique se este email esta ativo em <span className="font-mono">public.operations_access</span>.</p>
-                      <p>Somente emails liberados acessam a aba em desenvolvimento.</p>
+                      <p>Somente emails liberados acessam o Operacional.</p>
                     </>
                   ) : isAccountDenied ? (
                     <>

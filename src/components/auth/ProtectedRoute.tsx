@@ -56,12 +56,14 @@ const ProtectedRoute = ({
   useEffect(() => {
     let ignore = false;
 
-    const validateAccess = async () => {
+    const validateAccess = async ({ showLoading = true } = {}) => {
       if (ignore) {
         return;
       }
 
-      setAccess({ status: "loading" });
+      if (showLoading) {
+        setAccess({ status: "loading" });
+      }
 
       const requestedUserId = getUserIdFromSearch(location.search);
       const authorizedUserId = getAuthorizedUserIdFromSearch(location.search);
@@ -214,8 +216,12 @@ const ProtectedRoute = ({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void validateAccess();
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+        return;
+      }
+
+      void validateAccess({ showLoading: false });
     });
 
     return () => {

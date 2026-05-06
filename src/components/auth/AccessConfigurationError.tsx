@@ -40,7 +40,7 @@ const AccessConfigurationError = ({ details }: AccessConfigurationErrorProps) =>
                 <p>Execute a migration de acesso no Supabase.</p>
                 <p>Crie o usuario no Supabase Auth.</p>
                 <p>Para dashboard e agenda, cadastre uma linha em <span className="font-mono">public.dashboard_access</span> ligando o usuario autenticado ao <span className="font-mono">userid</span> permitido.</p>
-                <p>Para a aba em desenvolvimento, cadastre o email em <span className="font-mono">public.operations_access</span> com o papel correto.</p>
+                <p>Para o Operacional, cadastre o email em <span className="font-mono">public.operations_access</span> com o papel correto.</p>
               </div>
             </div>
           </div>

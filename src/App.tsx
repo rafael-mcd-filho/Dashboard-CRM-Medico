@@ -15,12 +15,31 @@ import AbaEspirometria from "./pages/AbaEspirometria";
 import AbaProcedimentosCirurgicos from "./pages/AbaProcedimentosCirurgicos";
 import EmDesenvolvimentoIsolada from "./pages/EmDesenvolvimentoIsolada";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnReconnect: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const RootRedirect = () => {
   const location = useLocation();
 
   return <Navigate to={{ pathname: "/visao-geral", search: location.search }} replace />;
+};
+
+const LegacyOperationalRedirect = () => {
+  const location = useLocation();
+
+  return <Navigate to={{ pathname: "/operacional", search: location.search }} replace />;
+};
+
+const LegacyAgendaRedirect = () => {
+  const location = useLocation();
+
+  return <Navigate to={{ pathname: "/agenda", search: location.search }} replace />;
 };
 
 const App = () => (
@@ -47,21 +66,24 @@ const App = () => (
             <Route path="procedimentos-cirurgicos" element={<AbaProcedimentosCirurgicos />} />
           </Route>
           <Route
-            path="em-desenvolvimento/isolada"
+            path="operacional"
             element={
               <ProtectedRoute accessArea="operations">
                 <EmDesenvolvimentoIsolada />
               </ProtectedRoute>
             }
           />
+          <Route path="operacional/isolada" element={<LegacyOperationalRedirect />} />
+          <Route path="em-desenvolvimento/isolada" element={<LegacyOperationalRedirect />} />
           <Route
-            path="agenda/isolada"
+            path="agenda"
             element={
               <ProtectedRoute>
                 <AgendaIsolada />
               </ProtectedRoute>
             }
           />
+          <Route path="agenda/isolada" element={<LegacyAgendaRedirect />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

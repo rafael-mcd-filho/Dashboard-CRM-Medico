@@ -1,6 +1,18 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  endOfMonth,
+  endOfWeek,
+  format,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+  subMonths,
+  subWeeks,
+} from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  CalendarDays,
   Eye,
   Filter,
   Hammer,
@@ -9,9 +21,16 @@ import {
   ShieldCheck,
   SquarePen,
 } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { CardEditorSheet } from "@/components/operations/CardEditorSheet";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -43,6 +62,28 @@ import { useRouteAccess } from "@/lib/routeAccess";
 
 const PAGE_SIZE = 25;
 
+type AgendamentoShortcut =
+  | "today"
+  | "yesterday"
+  | "current_week"
+  | "previous_week"
+  | "current_month"
+  | "previous_month"
+  | "custom";
+
+const AGENDAMENTO_SHORTCUTS: {
+  label: string;
+  value: AgendamentoShortcut;
+}[] = [
+  { label: "Hoje", value: "today" },
+  { label: "Ontem", value: "yesterday" },
+  { label: "Semana atual", value: "current_week" },
+  { label: "Semana anterior", value: "previous_week" },
+  { label: "Mês atual", value: "current_month" },
+  { label: "Mês anterior", value: "previous_month" },
+  { label: "Personalizado", value: "custom" },
+];
+
 const ETAPAS_EXCLUIDAS_AGENDAMENTO = new Set([
   "captacao",
   "negociacao",
@@ -68,6 +109,78 @@ function emptyToNull(value: string) {
 
 function formatDateLabel(value: string | null) {
   return value && value.trim().length > 0 ? value : "-";
+}
+
+function toDateInputValue(date: Date) {
+  return format(date, "yyyy-MM-dd");
+}
+
+function parseDateInputValue(value: string) {
+  if (!value) return undefined;
+
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return undefined;
+
+  return new Date(year, month - 1, day);
+}
+
+function formatDateInputLabel(value: string) {
+  const parsed = parseDateInputValue(value);
+  return parsed ? format(parsed, "dd/MM/yyyy") : "";
+}
+
+function getAgendamentoShortcutRange(shortcut: AgendamentoShortcut) {
+  const today = new Date();
+
+  switch (shortcut) {
+    case "today":
+      return { from: today, to: today };
+    case "yesterday": {
+      const yesterday = subDays(today, 1);
+      return { from: yesterday, to: yesterday };
+    }
+    case "current_week":
+      return {
+        from: startOfWeek(today, { weekStartsOn: 1 }),
+        to: endOfWeek(today, { weekStartsOn: 1 }),
+      };
+    case "previous_week": {
+      const previousWeek = subWeeks(today, 1);
+      return {
+        from: startOfWeek(previousWeek, { weekStartsOn: 1 }),
+        to: endOfWeek(previousWeek, { weekStartsOn: 1 }),
+      };
+    }
+    case "current_month":
+      return { from: startOfMonth(today), to: endOfMonth(today) };
+    case "previous_month": {
+      const previousMonth = subMonths(today, 1);
+      return {
+        from: startOfMonth(previousMonth),
+        to: endOfMonth(previousMonth),
+      };
+    }
+    case "custom":
+      return null;
+    default:
+      return null;
+  }
+}
+
+function formatAgendamentoRangeLabel(from: string, to: string) {
+  if (from && to) {
+    return `${formatDateInputLabel(from)} - ${formatDateInputLabel(to)}`;
+  }
+
+  if (from) {
+    return `A partir de ${formatDateInputLabel(from)}`;
+  }
+
+  if (to) {
+    return `Até ${formatDateInputLabel(to)}`;
+  }
+
+  return "Selecionar período";
 }
 
 function isWithinDateRange(value: string | null, from: string, to: string) {
@@ -156,9 +269,39 @@ export default function AbaEmDesenvolvimento() {
   const [search, setSearch] = useState("");
   const [agendamentoFrom, setAgendamentoFrom] = useState("");
   const [agendamentoTo, setAgendamentoTo] = useState("");
+  const [agendamentoShortcut, setAgendamentoShortcut] =
+    useState<AgendamentoShortcut>("custom");
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
-  const roleLabel = canEditOperations ? "Editor" : "Somente visualizacao";
+  const roleLabel = canEditOperations ? "Editor" : "Somente visualização";
+  const agendamentoDateRange = useMemo<DateRange | undefined>(() => {
+    const from = parseDateInputValue(agendamentoFrom);
+    const to = parseDateInputValue(agendamentoTo);
+
+    if (!from && !to) return undefined;
+
+    return { from, to };
+  }, [agendamentoFrom, agendamentoTo]);
+  const agendamentoRangeLabel = useMemo(
+    () => formatAgendamentoRangeLabel(agendamentoFrom, agendamentoTo),
+    [agendamentoFrom, agendamentoTo]
+  );
+
+  const handleAgendamentoShortcutChange = (value: AgendamentoShortcut) => {
+    setAgendamentoShortcut(value);
+
+    const range = getAgendamentoShortcutRange(value);
+    if (!range) return;
+
+    setAgendamentoFrom(toDateInputValue(range.from));
+    setAgendamentoTo(toDateInputValue(range.to));
+  };
+
+  const handleAgendamentoRangeSelect = (range: DateRange | undefined) => {
+    setAgendamentoShortcut("custom");
+    setAgendamentoFrom(range?.from ? toDateInputValue(range.from) : "");
+    setAgendamentoTo(range?.to ? toDateInputValue(range.to) : "");
+  };
 
   const funnelScopedCards = useMemo(
     () =>
@@ -295,7 +438,7 @@ export default function AbaEmDesenvolvimento() {
       await queryClient.invalidateQueries();
     },
     onError: (mutationError: Error) => {
-      toast.error(mutationError.message || "Nao foi possivel salvar o card.");
+      toast.error(mutationError.message || "Não foi possível salvar o card.");
     },
   });
 
@@ -303,7 +446,7 @@ export default function AbaEmDesenvolvimento() {
     const { error: signOutError } = await supabase.auth.signOut();
 
     if (signOutError) {
-      toast.error(signOutError.message || "Nao foi possivel sair da conta.");
+      toast.error(signOutError.message || "Não foi possível sair da conta.");
       return;
     }
 
@@ -317,13 +460,13 @@ export default function AbaEmDesenvolvimento() {
           <div className="flex items-center gap-2">
             <Hammer className="h-5 w-5 text-clinic-blue" />
             <h1 className="text-balance text-xl font-semibold text-[#0F1923]">
-              Em desenvolvimento
+              Operacional
             </h1>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-[#5C6B7A]">
             {canEditOperations
-              ? "Central operacional para localizar cards dos funis e editar apenas pagamento, valor e descricao."
-              : "Central operacional para localizar e visualizar cards dos funis em modo somente leitura."}
+              ? "Operacional para localizar cards dos funis e editar apenas pagamento, valor, forma de pagamento e descrição."
+              : "Operacional para localizar e visualizar cards dos funis em modo somente leitura."}
           </p>
         </div>
 
@@ -404,7 +547,7 @@ export default function AbaEmDesenvolvimento() {
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Contato, ID, card, responsavel ou modalidade"
+                  placeholder="Contato, ID, card, responsável ou modalidade"
                   className="h-11 rounded-xl border-[#D8E0E8] bg-white pl-9"
                 />
               </div>
@@ -456,14 +599,14 @@ export default function AbaEmDesenvolvimento() {
 
             <div className="flex flex-col gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
-                Responsavel
+                Responsável
               </span>
               <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
                 <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8]">
-                  <SelectValue placeholder="Responsavel" />
+                  <SelectValue placeholder="Responsável" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[280px]">
-                  <SelectItem value="__all__">Todos responsaveis</SelectItem>
+                  <SelectItem value="__all__">Todos responsáveis</SelectItem>
                   {responsavelOptions.map((option) => (
                     <SelectItem key={option} value={option}>
                       {option}
@@ -506,6 +649,7 @@ export default function AbaEmDesenvolvimento() {
                 setSearch("");
                 setAgendamentoFrom("");
                 setAgendamentoTo("");
+                setAgendamentoShortcut("custom");
               }}
             >
               Limpar filtros
@@ -525,21 +669,48 @@ export default function AbaEmDesenvolvimento() {
                 </p>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 xl:w-[420px]">
-                <Input
-                  type="date"
-                  value={agendamentoFrom}
-                  onChange={(event) => setAgendamentoFrom(event.target.value)}
-                  aria-label="Data inicial do agendamento"
-                  className="h-11 rounded-xl border-[#D8E0E8] bg-white"
-                />
-                <Input
-                  type="date"
-                  value={agendamentoTo}
-                  onChange={(event) => setAgendamentoTo(event.target.value)}
-                  aria-label="Data final do agendamento"
-                  className="h-11 rounded-xl border-[#D8E0E8] bg-white"
-                />
+              <div className="grid gap-2 sm:grid-cols-[180px_minmax(260px,1fr)] xl:w-[520px]">
+                <Select
+                  value={agendamentoShortcut}
+                  onValueChange={(value) =>
+                    handleAgendamentoShortcutChange(
+                      value as AgendamentoShortcut
+                    )
+                  }
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8] bg-white">
+                    <SelectValue placeholder="Período" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[280px]">
+                    {AGENDAMENTO_SHORTCUTS.map((shortcut) => (
+                      <SelectItem key={shortcut.value} value={shortcut.value}>
+                        {shortcut.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 justify-start rounded-xl border-[#D8E0E8] bg-white px-3 text-left font-normal text-[#0F1923]"
+                    >
+                      <CalendarDays data-icon="inline-start" />
+                      <span className="truncate">{agendamentoRangeLabel}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="range"
+                      selected={agendamentoDateRange}
+                      onSelect={handleAgendamentoRangeSelect}
+                      numberOfMonths={2}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
@@ -553,14 +724,14 @@ export default function AbaEmDesenvolvimento() {
           </h2>
           <p className="mt-1 text-[13px] text-[#5C6B7A]">
             {canEditOperations
-              ? "Busque um card especifico, visualize os dados consolidados ou edite os campos financeiros permitidos."
-              : "Busque um card especifico e visualize os dados consolidados em modo somente leitura."}
+              ? "Busque um card específico, visualize os dados consolidados ou edite os campos financeiros permitidos."
+              : "Busque um card específico e visualize os dados consolidados em modo somente leitura."}
           </p>
         </div>
 
         {error ? (
           <div className="px-5 py-10 text-sm text-[#B42318]">
-            Nao foi possivel carregar os cards: {error.message}
+            Não foi possível carregar os cards: {error.message}
           </div>
         ) : isLoading ? (
           <div className="space-y-3 px-5 py-5">
@@ -585,35 +756,35 @@ export default function AbaEmDesenvolvimento() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-[#FAFBFC] hover:bg-[#FAFBFC]">
-                  <TableHead className="px-5 text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="px-5 text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Funil
                   </TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Contato
                   </TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Responsavel
+                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    Responsável
                   </TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Tipo de paciente
                   </TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Modalidade de pagamento
                   </TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Forma de pagamento
                   </TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Agendamento
                   </TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Valor
                   </TableHead>
-                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Pagamento
                   </TableHead>
-                  <TableHead className="pr-5 text-right text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Acao
+                  <TableHead className="pr-5 text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    Ação
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -681,32 +852,36 @@ export default function AbaEmDesenvolvimento() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="pr-5 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <TableCell className="pr-5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           <Button
                             type="button"
                             variant="outline"
-                            className="h-9 rounded-xl border-[#D8E0E8]"
+                            size="icon"
+                            className="h-9 w-9 rounded-xl border-[#D8E0E8]"
+                            aria-label="Visualizar card"
+                            title="Visualizar"
                             onClick={() => {
                               setSelectedCard(card);
                               setSheetMode("view");
                             }}
                           >
-                            <Eye data-icon="inline-start" />
-                            Visualizar
+                            <Eye />
                           </Button>
                           {canEditOperations ? (
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-9 rounded-xl border-[#D8E0E8]"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl border-[#D8E0E8]"
+                              aria-label="Editar card"
+                              title="Editar"
                               onClick={() => {
                                 setSelectedCard(card);
                                 setSheetMode("edit");
                               }}
                             >
-                              <SquarePen data-icon="inline-start" />
-                              Editar
+                              <SquarePen />
                             </Button>
                           ) : null}
                         </div>
