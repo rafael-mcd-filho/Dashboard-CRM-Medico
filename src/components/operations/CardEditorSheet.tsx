@@ -119,6 +119,9 @@ export function CardEditorSheet({
   const Icon = meta.icon;
   const isEditMode = mode === "edit" && canEdit;
   const typeValue = getCardTypeValue(card);
+  const editableTone = isEditMode ? "editable" : "readonly";
+  const isBroncoscopia = draft.funnel === "broncoscopia";
+  const isProcedimento = draft.funnel === "cirurgia";
 
   const updateField = <K extends keyof FunnelCardDraft>(
     field: K,
@@ -161,7 +164,7 @@ export function CardEditorSheet({
             </SheetTitle>
             <SheetDescription className="max-w-[60ch] text-[13px] leading-6 text-[#5C6B7A]">
               {isEditMode
-                ? "Somente data de pagamento, valor, forma de pagamento e descrição podem ser alterados nesta tela."
+                ? "Somente os campos destacados podem ser alterados nesta tela."
                 : canEdit
                   ? "Consulte os dados consolidados do card. Para ajustes, use a ação de editar."
                   : "Seu acesso permite apenas visualizar os dados consolidados do card."}
@@ -250,7 +253,7 @@ export function CardEditorSheet({
                     ].join("  |  ")}
                   />
                 </Field>
-                <Field label="Data de pagamento" tone={isEditMode ? "editable" : "readonly"}>
+                <Field label="Data de pagamento" tone={editableTone}>
                   <Input
                     value={draft.data_pagamento}
                     onChange={(event) =>
@@ -261,7 +264,7 @@ export function CardEditorSheet({
                     className={isEditMode ? editableInputClass : readonlyInputClass}
                   />
                 </Field>
-                <Field label="Valor" tone={isEditMode ? "editable" : "readonly"}>
+                <Field label="Valor" tone={editableTone}>
                   <Input
                     value={draft.valor_atribuido}
                     onChange={(event) =>
@@ -272,7 +275,7 @@ export function CardEditorSheet({
                     className={isEditMode ? editableInputClass : readonlyInputClass}
                   />
                 </Field>
-                <Field label="Forma de pagamento" tone={isEditMode ? "editable" : "readonly"}>
+                <Field label="Forma de pagamento" tone={editableTone}>
                   {isEditMode ? (
                     <Select
                       value={draft.forma_pagamento || "__empty__"}
@@ -299,6 +302,113 @@ export function CardEditorSheet({
                     />
                   )}
                 </Field>
+                {isBroncoscopia ? (
+                  <>
+                    <Field label="Custos de exame" tone={editableTone}>
+                      <Input
+                        value={draft.custos_exame}
+                        onChange={(event) =>
+                          updateField("custos_exame", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Ex.: 1500 ou R$ 1.500,00"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                    <Field label="Comissões" tone={editableTone}>
+                      <Input
+                        value={draft.comissoes}
+                        onChange={(event) =>
+                          updateField("comissoes", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Ex.: 1500 ou R$ 1.500,00"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                    <Field label="Impostos" tone={editableTone}>
+                      <Input
+                        value={draft.impostos}
+                        onChange={(event) =>
+                          updateField("impostos", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Ex.: 1500 ou R$ 1.500,00"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                  </>
+                ) : null}
+                {isProcedimento ? (
+                  <>
+                    <Field label="Custo anestesia" tone={editableTone}>
+                      <Input
+                        value={draft.custo_anestesia}
+                        onChange={(event) =>
+                          updateField("custo_anestesia", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Ex.: 1500 ou R$ 1.500,00"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                    <Field label="Custo comissão" tone={editableTone}>
+                      <Input
+                        value={draft.custo_comissao}
+                        onChange={(event) =>
+                          updateField("custo_comissao", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Ex.: 1500 ou R$ 1.500,00"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                    <Field label="Custo hospital" tone={editableTone}>
+                      <Input
+                        value={draft.custo_hospital}
+                        onChange={(event) =>
+                          updateField("custo_hospital", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Ex.: 1500 ou R$ 1.500,00"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                    <Field label="Custo instrumentação" tone={editableTone}>
+                      <Input
+                        value={draft.custo_instrumentacao}
+                        onChange={(event) =>
+                          updateField("custo_instrumentacao", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Ex.: 1500 ou R$ 1.500,00"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                    <Field label="Impostos" tone={editableTone}>
+                      <Input
+                        value={draft.impostos}
+                        onChange={(event) =>
+                          updateField("impostos", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Ex.: 1500 ou R$ 1.500,00"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                    <Field label="Médico auxiliar" tone={editableTone}>
+                      <Input
+                        value={draft.medico_auxiliar}
+                        onChange={(event) =>
+                          updateField("medico_auxiliar", event.target.value)
+                        }
+                        readOnly={!isEditMode}
+                        placeholder="Nome do médico auxiliar"
+                        className={isEditMode ? editableInputClass : readonlyInputClass}
+                      />
+                    </Field>
+                  </>
+                ) : null}
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -313,7 +423,7 @@ export function CardEditorSheet({
               </div>
 
               <div className="mt-4">
-                <Field label="Descrição" tone={isEditMode ? "editable" : "readonly"}>
+                <Field label="Descrição" tone={editableTone}>
                   <Textarea
                     value={draft.descricao_card}
                     onChange={(event) =>

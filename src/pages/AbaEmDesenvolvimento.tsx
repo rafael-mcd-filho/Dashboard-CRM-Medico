@@ -228,7 +228,12 @@ async function saveCardDraft(draft: FunnelCardDraft) {
     case "broncoscopia": {
       const { error } = await supabase
         .from("broncoscopia")
-        .update(editablePayload)
+        .update({
+          ...editablePayload,
+          custos_exame: emptyToNull(draft.custos_exame),
+          comissoes: emptyToNull(draft.comissoes),
+          impostos: emptyToNull(draft.impostos),
+        })
         .eq("id", draft.sourceId);
 
       if (error) throw error;
@@ -237,7 +242,15 @@ async function saveCardDraft(draft: FunnelCardDraft) {
     case "procedimentos_cirurgicos": {
       const { error } = await supabase
         .from("procedimentos_cirurgicos")
-        .update(editablePayload)
+        .update({
+          ...editablePayload,
+          custo_anestesia: emptyToNull(draft.custo_anestesia),
+          custo_comissao: emptyToNull(draft.custo_comissao),
+          custo_hospital: emptyToNull(draft.custo_hospital),
+          custo_instrumentacao: emptyToNull(draft.custo_instrumentacao),
+          impostos: emptyToNull(draft.impostos),
+          medico_auxiliar: emptyToNull(draft.medico_auxiliar),
+        })
         .eq("id", draft.sourceId);
 
       if (error) throw error;

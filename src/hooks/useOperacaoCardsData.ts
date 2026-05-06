@@ -33,6 +33,9 @@ type EspirometriaOperacaoRow = BaseOperacaoRow;
 type BroncoscopiaOperacaoRow = BaseOperacaoRow & {
   tipo_paciente: string | null;
   quantidade_codigos: string | null;
+  custos_exame: string | null;
+  comissoes: string | null;
+  impostos: string | null;
 };
 
 type ProcedimentoOperacaoRow = BaseOperacaoRow & {
@@ -42,6 +45,7 @@ type ProcedimentoOperacaoRow = BaseOperacaoRow & {
   custo_hospital: string | null;
   custo_instrumentacao: string | null;
   impostos: string | null;
+  medico_auxiliar: string | null;
 };
 
 async function fetchAllRows<T>(table: string, select: string) {
@@ -92,11 +96,11 @@ export function useOperacaoCardsData() {
           ),
           fetchAllRows<BroncoscopiaOperacaoRow>(
             "broncoscopia",
-            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_paciente, quantidade_codigos"
+            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_paciente, quantidade_codigos, custos_exame, comissoes, impostos"
           ),
           fetchAllRows<ProcedimentoOperacaoRow>(
             "procedimentos_cirurgicos",
-            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_paciente, custo_anestesia, custo_comissao, custo_hospital, custo_instrumentacao, impostos"
+            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_paciente, custo_anestesia, custo_comissao, custo_hospital, custo_instrumentacao, impostos, medico_auxiliar"
           ),
         ]);
 
@@ -108,11 +112,14 @@ export function useOperacaoCardsData() {
           funnel: "consultas" as const,
           tipo_paciente: null,
           quantidade_codigos: null,
+          custos_exame: null,
+          comissoes: null,
           custo_anestesia: null,
           custo_comissao: null,
           custo_hospital: null,
           custo_instrumentacao: null,
           impostos: null,
+          medico_auxiliar: null,
         })),
         ...espirometria.map((row) => ({
           ...row,
@@ -122,11 +129,14 @@ export function useOperacaoCardsData() {
           tipo_consulta: null,
           tipo_paciente: null,
           quantidade_codigos: null,
+          custos_exame: null,
+          comissoes: null,
           custo_anestesia: null,
           custo_comissao: null,
           custo_hospital: null,
           custo_instrumentacao: null,
           impostos: null,
+          medico_auxiliar: null,
         })),
         ...broncoscopia.map((row) => ({
           ...row,
@@ -138,7 +148,7 @@ export function useOperacaoCardsData() {
           custo_comissao: null,
           custo_hospital: null,
           custo_instrumentacao: null,
-          impostos: null,
+          medico_auxiliar: null,
         })),
         ...procedimentos.map((row) => ({
           ...row,
@@ -147,6 +157,8 @@ export function useOperacaoCardsData() {
           funnel: "cirurgia" as const,
           tipo_consulta: null,
           quantidade_codigos: null,
+          custos_exame: null,
+          comissoes: null,
         })),
       ].sort((a, b) => {
         const diff = getSortTime(b) - getSortTime(a);

@@ -41,11 +41,14 @@ export type UnifiedFunnelCard = {
   tipo_paciente: string | null;
   quantidade_codigos: string | null;
   forma_pagamento: string | null;
+  custos_exame: string | null;
+  comissoes: string | null;
   custo_anestesia: string | null;
   custo_comissao: string | null;
   custo_hospital: string | null;
   custo_instrumentacao: string | null;
   impostos: string | null;
+  medico_auxiliar: string | null;
 };
 
 export type FunnelCardDraft = {
@@ -67,11 +70,14 @@ export type FunnelCardDraft = {
   tipo_paciente: string;
   quantidade_codigos: string;
   forma_pagamento: string;
+  custos_exame: string;
+  comissoes: string;
   custo_anestesia: string;
   custo_comissao: string;
   custo_hospital: string;
   custo_instrumentacao: string;
   impostos: string;
+  medico_auxiliar: string;
 };
 
 export const FUNNEL_CARD_META: Record<
@@ -150,11 +156,14 @@ export function createFunnelCardDraft(card: UnifiedFunnelCard): FunnelCardDraft 
     tipo_paciente: card.tipo_paciente ?? "",
     quantidade_codigos: card.quantidade_codigos ?? "",
     forma_pagamento: card.forma_pagamento ?? "",
+    custos_exame: card.custos_exame ?? "",
+    comissoes: card.comissoes ?? "",
     custo_anestesia: card.custo_anestesia ?? "",
     custo_comissao: card.custo_comissao ?? "",
     custo_hospital: card.custo_hospital ?? "",
     custo_instrumentacao: card.custo_instrumentacao ?? "",
     impostos: card.impostos ?? "",
+    medico_auxiliar: card.medico_auxiliar ?? "",
   };
 }
 
