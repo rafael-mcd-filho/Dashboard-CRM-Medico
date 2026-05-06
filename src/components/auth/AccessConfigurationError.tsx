@@ -12,7 +12,7 @@ const AccessConfigurationError = ({ details }: AccessConfigurationErrorProps) =>
       icon={DatabaseZap}
       tone="rose"
       title="A estrutura segura de acesso ainda nao foi concluida."
-      description="O login foi processado, mas o backend ainda nao encontrou a configuracao de permissoes esperada para liberar a leitura do dashboard."
+      description="O login foi processado, mas o backend ainda nao encontrou a configuracao de permissoes esperada para liberar este acesso."
       highlights={[
         {
           label: "Provavel causa",
@@ -39,7 +39,8 @@ const AccessConfigurationError = ({ details }: AccessConfigurationErrorProps) =>
               <div className="space-y-2 text-sm leading-7 text-[#5C6B7A]">
                 <p>Execute a migration de acesso no Supabase.</p>
                 <p>Crie o usuario no Supabase Auth.</p>
-                <p>Cadastre uma linha em <span className="font-mono">public.dashboard_access</span> ligando o usuario autenticado ao <span className="font-mono">userid</span> permitido.</p>
+                <p>Para dashboard e agenda, cadastre uma linha em <span className="font-mono">public.dashboard_access</span> ligando o usuario autenticado ao <span className="font-mono">userid</span> permitido.</p>
+                <p>Para a aba em desenvolvimento, cadastre o email em <span className="font-mono">public.operations_access</span> com o papel correto.</p>
               </div>
             </div>
           </div>

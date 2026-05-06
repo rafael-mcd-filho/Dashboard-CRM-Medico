@@ -741,6 +741,7 @@ export default function AbaBroncoscopia() {
                     ["Agendamento", "text-left px-4"],
                     ["Tipo", "text-left px-4"],
                     ["Modalidade", "text-left px-4"],
+                    ["Forma Pgto", "text-left px-4"],
                     ["Cód.", "text-center px-3"],
                     ["Etapa", "text-left px-4"],
                     ["Valor", "text-right px-4"],
@@ -779,6 +780,9 @@ export default function AbaBroncoscopia() {
                       </td>
                       <td className="px-4 py-2.5 text-[#5C6B7A]">
                         {row.modalidade}
+                      </td>
+                      <td className="px-4 py-2.5 text-[#5C6B7A]">
+                        {row.forma_pagamento !== "—" ? row.forma_pagamento : "-"}
                       </td>
                       <td className="px-3 py-2.5 text-center font-mono text-xs text-[#5C6B7A]">
                         {row.qtd_codigos}

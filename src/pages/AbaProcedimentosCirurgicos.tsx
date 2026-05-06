@@ -860,6 +860,7 @@ export default function AbaProcedimentosCirurgicos() {
                     ["Agendamento", "text-left px-4"],
                     ["Tipo", "text-left px-4"],
                     ["Modalidade", "text-left px-4"],
+                    ["Forma Pgto", "text-left px-4"],
                     ["Etapa", "text-left px-4"],
                     ["Valor bruto", "text-right px-4"],
                     ["Custo", "text-right px-4"],
@@ -895,6 +896,7 @@ export default function AbaProcedimentosCirurgicos() {
                       </td>
                       <td className="px-4 py-2.5 text-[#5C6B7A]">{row.tipo}</td>
                       <td className="px-4 py-2.5 text-[#5C6B7A]">{row.modalidade}</td>
+                      <td className="px-4 py-2.5 text-[#5C6B7A]">{row.forma_pagamento !== "—" ? row.forma_pagamento : "-"}</td>
                       <td className="px-4 py-2.5">
                         <span
                           className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"

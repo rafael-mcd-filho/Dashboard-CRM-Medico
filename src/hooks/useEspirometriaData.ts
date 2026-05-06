@@ -29,6 +29,7 @@ type EspirometriaRow = {
   responsavel: string | null;
   etapa_no_crm: string | null;
   modalidade_pagamento: string | null;
+  forma_pagamento: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
   data_pagamento: string | null;
@@ -241,6 +242,7 @@ function buildEspirometriaMetrics(
         nome: row.nome_contato ?? "—",
         data_agendamento: row.data_agendamento ?? "—",
         modalidade: getDimensionLabel(row.modalidade_pagamento),
+        forma_pagamento: row.forma_pagamento ?? "—",
         origem: contato ? getContatoOrigemAgrupada(contato) : "Não definido",
         etapa: getDimensionLabel(row.etapa_no_crm),
         valor: parseMonetary(row.valor_atribuido),
@@ -318,7 +320,7 @@ export function useEspirometriaData() {
         .from("espirometria")
         .select(
           "id, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, " +
-            "data_criacao_card, data_agendamento, data_pagamento, valor_atribuido"
+            "forma_pagamento, data_criacao_card, data_agendamento, data_pagamento, valor_atribuido"
         );
 
       if (error) throw error;

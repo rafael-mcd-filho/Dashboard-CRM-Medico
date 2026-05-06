@@ -49,7 +49,7 @@ const App = () => (
           <Route
             path="em-desenvolvimento/isolada"
             element={
-              <ProtectedRoute allowRecognizedUserIdAccess={false}>
+              <ProtectedRoute accessArea="operations">
                 <EmDesenvolvimentoIsolada />
               </ProtectedRoute>
             }

@@ -1,7 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   CalendarDays,
-  Hammer,
   LayoutDashboard,
   Microscope,
   Stethoscope,
@@ -20,12 +19,6 @@ const navItems = [
     label: "Proc. Cirurgicos",
     path: "/procedimentos-cirurgicos",
     icon: Stethoscope,
-  },
-  {
-    label: "Em Desenvolvimento",
-    path: "/em-desenvolvimento/isolada",
-    icon: Hammer,
-    openInNewTab: true,
   },
 ];
 
@@ -53,22 +46,7 @@ export function Sidebar() {
         <p className="section-label px-2 pb-2 pt-1" aria-hidden="true">
           Painel
         </p>
-        {navItems.map(({ label, path, icon: Icon, openInNewTab }) => {
-          if (openInNewTab) {
-            return (
-              <a
-                key={path}
-                href={`${path}${search}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[#5C6B7A] transition-all duration-150 hover:bg-[#F7F9FB] hover:text-[#0F1923] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clinic-blue focus-visible:ring-inset"
-              >
-                <Icon className="h-4 w-4 shrink-0 text-[#9BAAB8] transition-colors" />
-                {label}
-              </a>
-            );
-          }
-
+        {navItems.map(({ label, path, icon: Icon }) => {
           return (
             <NavLink
               key={path}

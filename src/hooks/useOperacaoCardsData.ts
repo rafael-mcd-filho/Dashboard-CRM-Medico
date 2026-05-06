@@ -13,6 +13,7 @@ type BaseOperacaoRow = {
   responsavel: string | null;
   etapa_no_crm: string | null;
   modalidade_pagamento: string | null;
+  forma_pagamento: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
   horario_agendamento: string | null;
@@ -83,19 +84,19 @@ export function useOperacaoCardsData() {
         await Promise.all([
           fetchAllRows<ConsultaOperacaoRow>(
             "consultas",
-            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_consulta"
+            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_consulta"
           ),
           fetchAllRows<EspirometriaOperacaoRow>(
             "espirometria",
-            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card"
+            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card"
           ),
           fetchAllRows<BroncoscopiaOperacaoRow>(
             "broncoscopia",
-            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_paciente, quantidade_codigos"
+            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_paciente, quantidade_codigos"
           ),
           fetchAllRows<ProcedimentoOperacaoRow>(
             "procedimentos_cirurgicos",
-            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_paciente, custo_anestesia, custo_comissao, custo_hospital, custo_instrumentacao, impostos"
+            "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_criacao_card, data_agendamento, horario_agendamento, data_pagamento, valor_atribuido, descricao_card, link_da_conversa, id_do_card, tipo_paciente, custo_anestesia, custo_comissao, custo_hospital, custo_instrumentacao, impostos"
           ),
         ]);
 

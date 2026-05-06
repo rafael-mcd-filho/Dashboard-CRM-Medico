@@ -68,6 +68,27 @@ export type Database = {
         }
         Relationships: []
       }
+      operations_access: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+          role: "viewer" | "editor"
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+          role: "viewer" | "editor"
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+          role?: "viewer" | "editor"
+        }
+        Relationships: []
+      }
       broncoscopia: {
         Row: {
           contato_id: string | null
@@ -80,6 +101,7 @@ export type Database = {
           data_pagamento: string | null
           descricao_card: string | null
           etapa_no_crm: string | null
+          forma_pagamento: string | null
           funil_painel_crm: string | null
           horario_agendamento: string | null
           id: string
@@ -106,6 +128,7 @@ export type Database = {
           data_pagamento?: string | null
           descricao_card?: string | null
           etapa_no_crm?: string | null
+          forma_pagamento?: string | null
           funil_painel_crm?: string | null
           horario_agendamento?: string | null
           id?: string
@@ -132,6 +155,7 @@ export type Database = {
           data_pagamento?: string | null
           descricao_card?: string | null
           etapa_no_crm?: string | null
+          forma_pagamento?: string | null
           funil_painel_crm?: string | null
           horario_agendamento?: string | null
           id?: string
@@ -160,6 +184,7 @@ export type Database = {
           data_pagamento: string | null
           descricao_card: string | null
           etapa_no_crm: string | null
+          forma_pagamento: string | null
           funil_painel_crm: string | null
           horario_agendamento: string | null
           id: string
@@ -184,6 +209,7 @@ export type Database = {
           data_pagamento?: string | null
           descricao_card?: string | null
           etapa_no_crm?: string | null
+          forma_pagamento?: string | null
           funil_painel_crm?: string | null
           horario_agendamento?: string | null
           id?: string
@@ -208,6 +234,7 @@ export type Database = {
           data_pagamento?: string | null
           descricao_card?: string | null
           etapa_no_crm?: string | null
+          forma_pagamento?: string | null
           funil_painel_crm?: string | null
           horario_agendamento?: string | null
           id?: string
@@ -235,6 +262,7 @@ export type Database = {
           data_pagamento: string | null
           descricao_card: string | null
           etapa_no_crm: string | null
+          forma_pagamento: string | null
           funil_painel_crm: string | null
           horario_agendamento: string | null
           id: string
@@ -258,6 +286,7 @@ export type Database = {
           data_pagamento?: string | null
           descricao_card?: string | null
           etapa_no_crm?: string | null
+          forma_pagamento?: string | null
           funil_painel_crm?: string | null
           horario_agendamento?: string | null
           id?: string
@@ -281,6 +310,7 @@ export type Database = {
           data_pagamento?: string | null
           descricao_card?: string | null
           etapa_no_crm?: string | null
+          forma_pagamento?: string | null
           funil_painel_crm?: string | null
           horario_agendamento?: string | null
           id?: string
@@ -311,6 +341,7 @@ export type Database = {
           data_pagamento: string | null
           descricao_card: string | null
           etapa_no_crm: string | null
+          forma_pagamento: string | null
           funil_painel_crm: string | null
           horario_agendamento: string | null
           id: string
@@ -341,6 +372,7 @@ export type Database = {
           data_pagamento?: string | null
           descricao_card?: string | null
           etapa_no_crm?: string | null
+          forma_pagamento?: string | null
           funil_painel_crm?: string | null
           horario_agendamento?: string | null
           id?: string
@@ -371,6 +403,7 @@ export type Database = {
           data_pagamento?: string | null
           descricao_card?: string | null
           etapa_no_crm?: string | null
+          forma_pagamento?: string | null
           funil_painel_crm?: string | null
           horario_agendamento?: string | null
           id?: string

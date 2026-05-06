@@ -30,6 +30,7 @@ type ProcRow = {
   etapa_no_crm: string | null;
   tipo_paciente: string | null;
   modalidade_pagamento: string | null;
+  forma_pagamento: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
   data_pagamento: string | null;
@@ -331,6 +332,7 @@ function buildProcedimentosMetrics(
       data_agendamento: row.data_agendamento ?? "—",
       tipo: getDimensionLabel(row.tipo_paciente),
       modalidade: getDimensionLabel(row.modalidade_pagamento),
+      forma_pagamento: row.forma_pagamento ?? "—",
       etapa: getDimensionLabel(row.etapa_no_crm),
       valor_bruto: parseMonetary(row.valor_atribuido),
       custo: custoRow(row),
@@ -430,7 +432,7 @@ export function useProcedimentosData() {
         .from("procedimentos_cirurgicos")
         .select(
           "id, contato_id, nome_contato, responsavel, etapa_no_crm, tipo_paciente, " +
-            "modalidade_pagamento, data_criacao_card, " +
+            "modalidade_pagamento, forma_pagamento, data_criacao_card, " +
             "data_agendamento, data_pagamento, valor_atribuido, " +
             "custo_anestesia, custo_comissao, custo_hospital, custo_instrumentacao, impostos"
         );

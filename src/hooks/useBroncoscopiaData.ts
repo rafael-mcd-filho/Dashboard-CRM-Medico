@@ -30,6 +30,7 @@ type BroncoscopiaRow = {
   etapa_no_crm: string | null;
   tipo_paciente: string | null;
   modalidade_pagamento: string | null;
+  forma_pagamento: string | null;
   quantidade_codigos: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
@@ -282,6 +283,7 @@ function buildBroncoscopiaMetrics(
         data_agendamento: row.data_agendamento ?? "—",
         tipo_paciente: getDimensionLabel(row.tipo_paciente),
         modalidade: getDimensionLabel(row.modalidade_pagamento),
+        forma_pagamento: row.forma_pagamento ?? "—",
         origem: contato ? getContatoOrigemAgrupada(contato) : "Não definido",
         qtd_codigos: getDimensionLabel(row.quantidade_codigos),
         etapa: getDimensionLabel(row.etapa_no_crm),
@@ -368,7 +370,7 @@ export function useBroncoscopiaData() {
         .from("broncoscopia")
         .select(
           "id, contato_id, nome_contato, responsavel, etapa_no_crm, tipo_paciente, " +
-            "modalidade_pagamento, quantidade_codigos, data_criacao_card, " +
+            "modalidade_pagamento, forma_pagamento, quantidade_codigos, data_criacao_card, " +
             "data_agendamento, data_pagamento, valor_atribuido"
         );
 

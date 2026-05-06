@@ -10,15 +10,18 @@ type LocalAdminLoginDialogProps = {
   onSubmit: (credentials: { email: string; password: string }) => Promise<void>;
   errorMessage: string | null;
   isSubmitting: boolean;
+  accessArea?: "dashboard" | "operations";
 };
 
 const LocalAdminLoginDialog = ({
   onSubmit,
   errorMessage,
   isSubmitting,
+  accessArea = "dashboard",
 }: LocalAdminLoginDialogProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const isOperationsAccess = accessArea === "operations";
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -31,17 +34,31 @@ const LocalAdminLoginDialog = ({
       icon={ShieldCheck}
       tone="blue"
       title={
-        <>
-          Acesse o painel executivo
-          <br />
-          do CRM com seguranca
-        </>
+        isOperationsAccess ? (
+          <>
+            Acesse a central operacional
+            <br />
+            do CRM com seguranca
+          </>
+        ) : (
+          <>
+            Acesse o painel executivo
+            <br />
+            do CRM com seguranca
+          </>
+        )
       }
-      description="Entre com suas credenciais para visualizar indicadores, funis e acompanhamentos operacionais em um unico ambiente protegido."
+      description={
+        isOperationsAccess
+          ? "Entre com suas credenciais para visualizar os cards operacionais conforme sua permissao."
+          : "Entre com suas credenciais para visualizar indicadores, funis e acompanhamentos operacionais em um unico ambiente protegido."
+      }
       highlights={[
         {
-          label: "Visao central",
-          value: "Acompanhe indicadores, conversao e agenda em um so painel.",
+          label: isOperationsAccess ? "Central operacional" : "Visao central",
+          value: isOperationsAccess
+            ? "Localize cards dos funis em uma tela protegida por login."
+            : "Acompanhe indicadores, conversao e agenda em um so painel.",
         },
         {
           label: "Acesso protegido",
@@ -49,7 +66,9 @@ const LocalAdminLoginDialog = ({
         },
         {
           label: "Uso continuo",
-          value: "Retome sua rotina com acesso rapido ao panorama do CRM.",
+          value: isOperationsAccess
+            ? "Use sua permissao para consultar ou editar os cards liberados."
+            : "Retome sua rotina com acesso rapido ao panorama do CRM.",
         },
       ]}
     >
@@ -64,7 +83,7 @@ const LocalAdminLoginDialog = ({
                 Identificacao
               </p>
               <h2 className="text-[1.9rem] font-semibold leading-none tracking-[-0.04em] text-[#0F1923]">
-                Entrar no dashboard
+                {isOperationsAccess ? "Entrar na central" : "Entrar no dashboard"}
               </h2>
               <p className="max-w-sm text-sm leading-7 text-[#5C6B7A]">
                 Informe seus dados de acesso para continuar.
@@ -125,7 +144,9 @@ const LocalAdminLoginDialog = ({
           </form>
 
           <p className="text-xs leading-6 text-[#7A8794]">
-            Ao prosseguir, o acesso ao dashboard sera liberado conforme as regras configuradas para este ambiente.
+            {isOperationsAccess
+              ? "Ao prosseguir, a central operacional sera liberada conforme a permissao configurada para este email."
+              : "Ao prosseguir, o acesso ao dashboard sera liberado conforme as regras configuradas para este ambiente."}
           </p>
         </div>
       </div>

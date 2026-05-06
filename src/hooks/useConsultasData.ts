@@ -31,6 +31,7 @@ type ConsultaRow = {
   etapa_no_crm: string | null;
   tipo_consulta: string | null;
   modalidade_pagamento: string | null;
+  forma_pagamento: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
   data_pagamento: string | null;
@@ -389,6 +390,7 @@ function buildConsultasMetrics(
       data_agendamento: row.data_agendamento ?? "—",
       tipo: getDimensionLabel(row.tipo_consulta),
       modalidade: getDimensionLabel(row.modalidade_pagamento),
+      forma_pagamento: row.forma_pagamento ?? "—",
       origem: row.contato_id
         ? getContatoOrigemAgrupada(
             contatoOrigemMap.get(row.contato_id) ?? {
@@ -482,7 +484,7 @@ export function useConsultasData() {
         .from("consultas")
         .select(
           "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, tipo_consulta, " +
-            "modalidade_pagamento, data_criacao_card, " +
+            "modalidade_pagamento, forma_pagamento, data_criacao_card, " +
             "data_agendamento, data_pagamento, valor_atribuido"
         );
 

@@ -4,7 +4,9 @@ import {
   Eye,
   Filter,
   Hammer,
+  LogOut,
   Search,
+  ShieldCheck,
   SquarePen,
 } from "lucide-react";
 import { CardEditorSheet } from "@/components/operations/CardEditorSheet";
@@ -37,6 +39,7 @@ import {
 } from "@/lib/funnelCards";
 import { fmtBRL, fmtNum } from "@/lib/fmt";
 import { parseBRDate, parseMonetary } from "@/lib/parse";
+import { useRouteAccess } from "@/lib/routeAccess";
 
 const PAGE_SIZE = 25;
 
@@ -87,6 +90,7 @@ async function saveCardDraft(draft: FunnelCardDraft) {
     data_pagamento: emptyToNull(draft.data_pagamento),
     valor_atribuido: emptyToNull(draft.valor_atribuido),
     descricao_card: emptyToNull(draft.descricao_card),
+    forma_pagamento: emptyToNull(draft.forma_pagamento),
   };
 
   switch (draft.table) {
@@ -134,6 +138,7 @@ async function saveCardDraft(draft: FunnelCardDraft) {
 export default function AbaEmDesenvolvimento() {
   const queryClient = useQueryClient();
   const { data: cards = [], isLoading, error } = useOperacaoCardsData();
+  const { canEditOperations, userEmail } = useRouteAccess();
   const [selectedCard, setSelectedCard] = useState<UnifiedFunnelCard | null>(
     null
   );
@@ -153,6 +158,7 @@ export default function AbaEmDesenvolvimento() {
   const [agendamentoTo, setAgendamentoTo] = useState("");
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search);
+  const roleLabel = canEditOperations ? "Editor" : "Somente visualizacao";
 
   const funnelScopedCards = useMemo(
     () =>
@@ -213,6 +219,7 @@ export default function AbaEmDesenvolvimento() {
         card.responsavel,
         card.etapa_no_crm,
         card.modalidade_pagamento,
+        card.forma_pagamento,
         getCardTypeValue(card),
       ]
         .filter(Boolean)
@@ -292,6 +299,17 @@ export default function AbaEmDesenvolvimento() {
     },
   });
 
+  const handleSignOut = async () => {
+    const { error: signOutError } = await supabase.auth.signOut();
+
+    if (signOutError) {
+      toast.error(signOutError.message || "Nao foi possivel sair da conta.");
+      return;
+    }
+
+    queryClient.clear();
+  };
+
   return (
     <div className="animate-fade-in space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -303,18 +321,37 @@ export default function AbaEmDesenvolvimento() {
             </h1>
           </div>
           <p className="mt-1 max-w-3xl text-sm text-[#5C6B7A]">
-            Central operacional para localizar cards dos funis e editar apenas
-            pagamento, valor e descricao.
+            {canEditOperations
+              ? "Central operacional para localizar cards dos funis e editar apenas pagamento, valor e descricao."
+              : "Central operacional para localizar e visualizar cards dos funis em modo somente leitura."}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D8E6FF] bg-[#EEF4FF] px-3 py-1 text-[11px] font-medium text-clinic-blue">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            {roleLabel}
+          </span>
+          {userEmail ? (
+            <span className="rounded-full border border-[#E2E6EB] bg-white px-3 py-1 text-[11px] font-medium text-[#5C6B7A]">
+              {userEmail}
+            </span>
+          ) : null}
           <span className="rounded-full border border-[#D8E6FF] bg-[#EEF4FF] px-3 py-1 text-[11px] font-medium text-clinic-blue">
             {fmtNum(filteredCards.length)} cards filtrados
           </span>
           <span className="rounded-full border border-[#E2E6EB] bg-white px-3 py-1 text-[11px] font-medium text-[#5C6B7A]">
             Valor total: <span className="text-[#0F1923]">{fmtBRL(totalValue)}</span>
           </span>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 rounded-xl border-[#D8E0E8]"
+            onClick={() => void handleSignOut()}
+          >
+            <LogOut data-icon="inline-start" />
+            Sair
+          </Button>
         </div>
       </div>
 
@@ -515,8 +552,9 @@ export default function AbaEmDesenvolvimento() {
             Lista unificada de cards
           </h2>
           <p className="mt-1 text-[13px] text-[#5C6B7A]">
-            Busque um card especifico, visualize os dados consolidados ou edite
-            os campos financeiros permitidos.
+            {canEditOperations
+              ? "Busque um card especifico, visualize os dados consolidados ou edite os campos financeiros permitidos."
+              : "Busque um card especifico e visualize os dados consolidados em modo somente leitura."}
           </p>
         </div>
 
@@ -561,6 +599,9 @@ export default function AbaEmDesenvolvimento() {
                   </TableHead>
                   <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Modalidade de pagamento
+                  </TableHead>
+                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    Forma de pagamento
                   </TableHead>
                   <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Agendamento
@@ -611,6 +652,9 @@ export default function AbaEmDesenvolvimento() {
                         {card.modalidade_pagamento || "-"}
                       </TableCell>
                       <TableCell className="text-[#40505F]">
+                        {card.forma_pagamento || "-"}
+                      </TableCell>
+                      <TableCell className="text-[#40505F]">
                         <div>
                           <p>{formatDateLabel(card.data_agendamento)}</p>
                           <p className="mt-1 text-[12px] text-[#7C8B99]">
@@ -651,18 +695,20 @@ export default function AbaEmDesenvolvimento() {
                             <Eye data-icon="inline-start" />
                             Visualizar
                           </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-9 rounded-xl border-[#D8E0E8]"
-                            onClick={() => {
-                              setSelectedCard(card);
-                              setSheetMode("edit");
-                            }}
-                          >
-                            <SquarePen data-icon="inline-start" />
-                            Editar
-                          </Button>
+                          {canEditOperations ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 rounded-xl border-[#D8E0E8]"
+                              onClick={() => {
+                                setSelectedCard(card);
+                                setSheetMode("edit");
+                              }}
+                            >
+                              <SquarePen data-icon="inline-start" />
+                              Editar
+                            </Button>
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -714,9 +760,15 @@ export default function AbaEmDesenvolvimento() {
           }
         }}
         onSave={async (draft) => {
+          if (!canEditOperations) {
+            toast.error("Seu usuario nao tem permissao para editar cards.");
+            return;
+          }
+
           await updateMutation.mutateAsync(draft);
         }}
         isSaving={updateMutation.isPending}
+        canEdit={canEditOperations}
       />
     </div>
   );

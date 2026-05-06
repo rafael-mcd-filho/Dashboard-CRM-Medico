@@ -40,6 +40,7 @@ export type UnifiedFunnelCard = {
   tipo_consulta: string | null;
   tipo_paciente: string | null;
   quantidade_codigos: string | null;
+  forma_pagamento: string | null;
   custo_anestesia: string | null;
   custo_comissao: string | null;
   custo_hospital: string | null;
@@ -65,6 +66,7 @@ export type FunnelCardDraft = {
   tipo_consulta: string;
   tipo_paciente: string;
   quantidade_codigos: string;
+  forma_pagamento: string;
   custo_anestesia: string;
   custo_comissao: string;
   custo_hospital: string;
@@ -147,6 +149,7 @@ export function createFunnelCardDraft(card: UnifiedFunnelCard): FunnelCardDraft 
     tipo_consulta: card.tipo_consulta ?? "",
     tipo_paciente: card.tipo_paciente ?? "",
     quantidade_codigos: card.quantidade_codigos ?? "",
+    forma_pagamento: card.forma_pagamento ?? "",
     custo_anestesia: card.custo_anestesia ?? "",
     custo_comissao: card.custo_comissao ?? "",
     custo_hospital: card.custo_hospital ?? "",

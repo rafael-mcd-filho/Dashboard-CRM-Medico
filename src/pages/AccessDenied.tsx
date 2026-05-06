@@ -3,14 +3,21 @@ import AccessShell from "@/components/auth/AccessShell";
 
 type AccessDeniedProps = {
   userId: string | null;
-  mode?: "userid" | "account";
+  mode?: "userid" | "account" | "operations";
 };
 
 const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
-  const receivedCredential = userId ? `userid=${userId}` : "userid ausente";
+  const isOperationsDenied = mode === "operations";
+  const receivedCredential = isOperationsDenied
+    ? userId
+      ? `email=${userId}`
+      : "email ausente"
+    : userId
+      ? `userid=${userId}`
+      : "userid ausente";
   const isAccountDenied = mode === "account";
 
-  if (!isAccountDenied) {
+  if (!isAccountDenied && !isOperationsDenied) {
     return (
       <div className="relative min-h-screen overflow-hidden bg-[#F3F7FB] text-[#0F1923]">
         <div className="absolute left-[-8rem] top-[-6rem] h-[26rem] w-[26rem] rounded-full bg-[rgba(185,28,28,0.14)] blur-3xl" />
@@ -53,27 +60,37 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
     );
   }
 
-  const title = isAccountDenied
+  const title = isOperationsDenied
+    ? "Sua conta nao possui permissao para a central operacional."
+    : isAccountDenied
     ? userId
       ? "Sua conta nao possui permissao para este acesso."
       : "Sua conta ainda nao possui permissao para acessar o dashboard."
     : "Voce nao tem permissao para acessar esta aba.";
 
-  const description = isAccountDenied
+  const description = isOperationsDenied
+    ? "A autenticacao foi concluida, mas este email nao esta liberado para a aba em desenvolvimento. Solicite a revisao do acesso ao administrador do CRM."
+    : isAccountDenied
     ? userId
       ? "A autenticacao foi concluida, mas a conta atual nao possui vinculo ativo com o userid informado. Se isso estiver incorreto, solicite a revisao do acesso ao administrador do CRM."
       : "A autenticacao foi concluida, mas nenhuma permissao ativa foi encontrada para a conta atual. Solicite a liberacao ao administrador do CRM."
     : "Se voce acredita que isso e um engano, contacte o administrador do CRM.";
 
-  const statusText = isAccountDenied
+  const statusText = isOperationsDenied
+    ? "Autenticacao concluida, mas sem permissao ativa para a central operacional."
+    : isAccountDenied
     ? "Autenticacao concluida, mas sem permissao ativa para este painel."
     : "Acesso negado.";
 
-  const actionText = isAccountDenied
+  const actionText = isOperationsDenied
+    ? "Solicite a liberacao do email em public.operations_access."
+    : isAccountDenied
     ? "Solicite a associacao da sua conta com o acesso correto no CRM."
     : "Solicite a liberacao do seu usuario junto ao administrador do CRM.";
 
-  const detailText = isAccountDenied
+  const detailText = isOperationsDenied
+    ? "Nenhuma permissao operacional ativa foi localizada para a conta autenticada."
+    : isAccountDenied
     ? userId
       ? "A conta autenticada nao possui vinculo com o userid solicitado."
       : "Nenhuma permissao ativa foi localizada para a conta autenticada."
@@ -139,7 +156,13 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-[#0F1923]">O que verificar agora</p>
                 <div className="space-y-2 text-sm leading-7 text-[#5C6B7A]">
-                  {isAccountDenied ? (
+                  {isOperationsDenied ? (
+                    <>
+                      <p>Confirme se voce entrou com o email correto.</p>
+                      <p>Verifique se este email esta ativo em <span className="font-mono">public.operations_access</span>.</p>
+                      <p>Somente emails liberados acessam a aba em desenvolvimento.</p>
+                    </>
+                  ) : isAccountDenied ? (
                     <>
                       <p>Confirme se o link foi aberto com o <span className="font-mono">userid</span> correto.</p>
                       <p>Verifique se a conta autenticada esta vinculada ao acesso esperado.</p>

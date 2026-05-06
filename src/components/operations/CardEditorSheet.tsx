@@ -9,6 +9,13 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   FUNNEL_CARD_META,
@@ -27,6 +34,7 @@ type CardEditorSheetProps = {
   onOpenChange: (open: boolean) => void;
   onSave: (draft: FunnelCardDraft) => Promise<void>;
   isSaving: boolean;
+  canEdit: boolean;
 };
 
 function Field({
@@ -68,6 +76,7 @@ export function CardEditorSheet({
   onOpenChange,
   onSave,
   isSaving,
+  canEdit,
 }: CardEditorSheetProps) {
   const [draft, setDraft] = useState<FunnelCardDraft | null>(null);
 
@@ -81,7 +90,7 @@ export function CardEditorSheet({
 
   const meta = FUNNEL_CARD_META[card.funnel];
   const Icon = meta.icon;
-  const isEditMode = mode === "edit";
+  const isEditMode = mode === "edit" && canEdit;
   const typeValue = getCardTypeValue(card);
 
   const updateField = <K extends keyof FunnelCardDraft>(
@@ -125,8 +134,10 @@ export function CardEditorSheet({
             </SheetTitle>
             <SheetDescription className="max-w-[60ch] text-[13px] leading-6 text-[#5C6B7A]">
               {isEditMode
-                ? "Somente data de pagamento, valor e descricao podem ser alterados nesta tela."
-                : "Consulte os dados consolidados do card. Para ajustes, use a acao de editar."}
+                ? "Somente data de pagamento, valor, forma de pagamento e descricao podem ser alterados nesta tela."
+                : canEdit
+                  ? "Consulte os dados consolidados do card. Para ajustes, use a acao de editar."
+                  : "Seu acesso permite apenas visualizar os dados consolidados do card."}
             </SheetDescription>
           </SheetHeader>
 
@@ -175,8 +186,9 @@ export function CardEditorSheet({
                   Dados do card
                 </h3>
                 <p className="mt-1 text-[13px] text-[#5C6B7A]">
-                  Os campos abaixo servem para consulta operacional. Apenas os
-                  campos de pagamento, valor e descricao podem ser alterados.
+                  {canEdit
+                    ? "Os campos abaixo servem para consulta operacional. Apenas os campos de pagamento, valor, forma de pagamento e descricao podem ser alterados."
+                    : "Os campos abaixo servem para consulta operacional em modo somente leitura."}
                 </p>
               </div>
 
@@ -236,6 +248,33 @@ export function CardEditorSheet({
                       isEditMode ? "bg-white" : "bg-[#F7F9FB] text-[#40505F]"
                     }`}
                   />
+                </Field>
+                <Field label="Forma de pagamento">
+                  {isEditMode ? (
+                    <Select
+                      value={draft.forma_pagamento || "__empty__"}
+                      onValueChange={(value) =>
+                        updateField(
+                          "forma_pagamento",
+                          value === "__empty__" ? "" : value
+                        )
+                      }
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-[#D8E0E8] bg-white">
+                        <SelectValue placeholder="Nao informado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__empty__">Nao informado</SelectItem>
+                        <SelectItem value="PIX">PIX</SelectItem>
+                        <SelectItem value="Cartão">Cartão</SelectItem>
+                        <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <ReadonlyInput
+                      value={emptyLabel(draft.forma_pagamento, "Nao informado")}
+                    />
+                  )}
                 </Field>
               </div>
 

@@ -6,6 +6,7 @@ import { getDateModeLabel, type DashboardDateMode } from "@/lib/dateMode";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SessionSignOutButton } from "@/components/auth/SessionSignOutButton";
 import {
   Select,
   SelectContent,
@@ -151,6 +152,8 @@ export function GlobalFilters() {
             ))}
           </SelectContent>
         </Select>
+
+        <SessionSignOutButton showEmail={false} />
       </div>
 
       {filters.somenteAnuncios && (

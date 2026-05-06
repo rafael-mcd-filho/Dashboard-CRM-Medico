@@ -10,23 +10,43 @@ import {
   getUserIdFromSearch,
   isRecognizedUserId,
 } from "@/lib/accessControl";
+import {
+  RouteAccessContext,
+  type OperationsAccessRole,
+} from "@/lib/routeAccess";
 import { supabase } from "@/integrations/supabase/client";
+
+type ProtectedAccessArea = "dashboard" | "operations";
 
 type ProtectedRouteProps = {
   children: ReactNode;
   allowRecognizedUserIdAccess?: boolean;
+  accessArea?: ProtectedAccessArea;
 };
 
 type AccessViewState =
   | { status: "loading" }
   | { status: "login-required" }
-  | { status: "authorized" }
-  | { status: "denied"; userId: string | null; mode: "userid" | "account" }
+  | {
+      status: "authorized";
+      userEmail: string | null;
+      operationsRole: OperationsAccessRole | null;
+    }
+  | {
+      status: "denied";
+      userId: string | null;
+      mode: "userid" | "account" | "operations";
+    }
   | { status: "config-error"; details?: string };
+
+function isOperationsAccessRole(value: string | null | undefined): value is OperationsAccessRole {
+  return value === "viewer" || value === "editor";
+}
 
 const ProtectedRoute = ({
   children,
   allowRecognizedUserIdAccess = true,
+  accessArea = "dashboard",
 }: ProtectedRouteProps) => {
   const location = useLocation();
   const [access, setAccess] = useState<AccessViewState>({ status: "loading" });
@@ -46,6 +66,69 @@ const ProtectedRoute = ({
       const requestedUserId = getUserIdFromSearch(location.search);
       const authorizedUserId = getAuthorizedUserIdFromSearch(location.search);
 
+      if (accessArea === "operations") {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          if (!ignore) {
+            setAccess({ status: "config-error", details: sessionError.message });
+          }
+          return;
+        }
+
+        if (!session) {
+          if (!ignore) {
+            setAccess({ status: "login-required" });
+          }
+          return;
+        }
+
+        const userEmail = session.user.email?.trim().toLowerCase() ?? null;
+
+        const { data: operationsAccess, error: operationsAccessError } =
+          await supabase
+            .from("operations_access")
+            .select("role")
+            .eq("active", true)
+            .maybeSingle();
+
+        if (operationsAccessError) {
+          const relationMissing =
+            operationsAccessError.code === "42P01" ||
+            operationsAccessError.message.toLowerCase().includes("operations_access");
+
+          if (!ignore) {
+            setAccess({
+              status: "config-error",
+              details: relationMissing
+                ? "A tabela public.operations_access ainda nao esta disponivel no backend."
+                : operationsAccessError.message,
+            });
+          }
+          return;
+        }
+
+        const operationsRole = isOperationsAccessRole(operationsAccess?.role)
+          ? operationsAccess.role
+          : null;
+
+        if (!operationsRole) {
+          if (!ignore) {
+            setAccess({ status: "denied", userId: userEmail, mode: "operations" });
+          }
+          return;
+        }
+
+        if (!ignore) {
+          setLoginError(null);
+          setAccess({ status: "authorized", userEmail, operationsRole });
+        }
+        return;
+      }
+
       if (!isRecognizedUserId(requestedUserId)) {
         if (!ignore) {
           setAccess({ status: "denied", userId: requestedUserId, mode: "userid" });
@@ -56,7 +139,11 @@ const ProtectedRoute = ({
       if (allowRecognizedUserIdAccess && authorizedUserId) {
         if (!ignore) {
           setLoginError(null);
-          setAccess({ status: "authorized" });
+          setAccess({
+            status: "authorized",
+            userEmail: null,
+            operationsRole: null,
+          });
         }
         return;
       }
@@ -115,7 +202,11 @@ const ProtectedRoute = ({
 
       if (!ignore) {
         setLoginError(null);
-        setAccess({ status: "authorized" });
+        setAccess({
+          status: "authorized",
+          userEmail: session.user.email?.trim().toLowerCase() ?? null,
+          operationsRole: null,
+        });
       }
     };
 
@@ -131,7 +222,7 @@ const ProtectedRoute = ({
       ignore = true;
       subscription.unsubscribe();
     };
-  }, [allowRecognizedUserIdAccess, location.search]);
+  }, [accessArea, allowRecognizedUserIdAccess, location.search]);
 
   const handleLogin = async ({ email, password }: { email: string; password: string }) => {
     setIsSubmitting(true);
@@ -159,6 +250,7 @@ const ProtectedRoute = ({
         onSubmit={handleLogin}
         errorMessage={loginError}
         isSubmitting={isSubmitting}
+        accessArea={accessArea}
       />
     );
   }
@@ -171,7 +263,24 @@ const ProtectedRoute = ({
     return <AccessDenied userId={access.userId} mode={access.mode} />;
   }
 
-  return <>{children}</>;
+  return (
+    <RouteAccessContext.Provider
+      value={{
+        userEmail: access.userEmail,
+        operationsRole: access.operationsRole,
+        canEditOperations: access.operationsRole === "editor",
+        signOut: async () => {
+          const { error } = await supabase.auth.signOut();
+
+          if (error) {
+            throw error;
+          }
+        },
+      }}
+    >
+      {children}
+    </RouteAccessContext.Provider>
+  );
 };
 
 export default ProtectedRoute;
