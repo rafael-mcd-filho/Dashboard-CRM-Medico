@@ -21,6 +21,8 @@ import {
 } from "recharts";
 import { CrossFunnelPanel } from "@/components/dashboard/CrossFunnelPanel";
 import { HeroMetricCard } from "@/components/dashboard/HeroMetricCard";
+import { LossDiagnosticsPanel } from "@/components/dashboard/LossDiagnosticsPanel";
+import { LossReasonsPanel } from "@/components/dashboard/LossReasonsPanel";
 import { PanelTitle } from "@/components/dashboard/PanelTitle";
 import { PresenceConversionPanel } from "@/components/dashboard/PresenceConversionPanel";
 import { RecordsDrilldownSheet } from "@/components/dashboard/RecordsDrilldownSheet";
@@ -188,6 +190,26 @@ export default function AbaGeral() {
           baseLabel="Base de consultas"
           comparison={d.comparisons?.charts.cross_funnel}
           isLoading={d.isLoading}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <LossReasonsPanel
+          title="Motivos de perda consolidados"
+          tooltip="Consolida apenas os cards na etapa Perdido dos quatro funis. Cada card usa o mapa de tags do seu próprio funil; quando nenhum ID é reconhecido, entra como Sem motivo mapeado."
+          items={d.motivos_perda}
+          comparison={d.comparisons?.charts.motivos_perda}
+          isLoading={d.isLoading}
+        />
+        <LossDiagnosticsPanel
+          title="Diagnóstico de perdas consolidado"
+          tooltip="Consolida os cards na etapa Perdido dos quatro funis, mantendo a origem agrupada e a classificação de motivo de cada funil."
+          diagnostics={d.perdas_diagnostico}
+          originItems={d.perdas_por_origem}
+          isLoading={d.isLoading}
+          unmappedComparison={d.comparisons?.kpis.perdas_sem_motivo_pct}
+          semRetornoComparison={d.comparisons?.kpis.perdas_sem_retorno_pct}
+          originsComparison={d.comparisons?.charts.perdas_por_origem}
         />
       </div>
 

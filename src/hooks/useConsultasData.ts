@@ -18,9 +18,20 @@ import {
   isRowInDateModeRange,
   type DashboardDateMode,
 } from "@/lib/dateMode";
+import {
+  getValorFaturavel,
+  hasRecebimentoFinanceiro,
+  isRetornoSemCobranca,
+  RETORNO_AGENDA_TAG,
+} from "@/lib/billing";
 import { buildEvolucao } from "@/lib/evolucao";
 import type { FunnelStageDrilldownRecord } from "@/lib/funnelDrilldown";
-import { calcDiffDias, parseMonetary } from "@/lib/parse";
+import {
+  buildLossDiagnostics,
+  buildLossOrigins,
+  buildLossReasons,
+} from "@/lib/lossReasons";
+import { calcDiffDias } from "@/lib/parse";
 
 type ConsultaRow = {
   id: string;
@@ -32,6 +43,7 @@ type ConsultaRow = {
   tipo_consulta: string | null;
   modalidade_pagamento: string | null;
   forma_pagamento: string | null;
+  tag_id_card: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
   data_pagamento: string | null;
@@ -206,6 +218,9 @@ function buildConsultasMetrics(
   const realizadasRows = agendadasRows.filter((row) =>
     ETAPAS_REALIZADAS.has(normalizeStage(row.etapa_no_crm))
   );
+  const realizadasFaturaveisRows = realizadasRows.filter(
+    (row) => !isRetornoSemCobranca(row.forma_pagamento)
+  );
 
   const noShowConsultaRows = agendadasRows.filter(
     (row) => normalizeStage(row.etapa_no_crm) === ETAPA_NO_SHOW_CONSULTA
@@ -223,15 +238,15 @@ function buildConsultasMetrics(
   const no_show_retorno_pct = realizadas > 0 ? no_show_retorno / realizadas : 0;
 
   const faturamento = realizadasRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
 
-  const pacientesRealizados = getUniqueContatoIds(realizadasRows);
+  const pacientesRealizados = getUniqueContatoIds(realizadasFaturaveisRows);
   const ticket_medio =
     pacientesRealizados.size > 0 ? faturamento / pacientesRealizados.size : 0;
 
-  const pagos = rows.filter((row) => Boolean(row.data_pagamento));
+  const pagos = rows.filter(hasRecebimentoFinanceiro);
   const pago_qtd = pagos.length;
   const pago_no_dia = pagos.filter(
     (row) =>
@@ -259,13 +274,20 @@ function buildConsultasMetrics(
     value: etapaMap[stage],
     color: FUNIL_COLORS[stage] ?? "#1A56DB",
   }));
+  const motivos_perda = buildLossReasons(rows, "consultas");
+  const getOrigem = (row: ConsultaRow) => {
+    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
+    return contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+  };
+  const perdas_diagnostico = buildLossDiagnostics(motivos_perda);
+  const perdas_por_origem = buildLossOrigins(rows, getOrigem);
 
   const tipoMap: Record<string, { qtd: number; fat: number }> = {};
   agendadasRows.forEach((row) => {
     const tipo = getDimensionLabel(row.tipo_consulta);
     if (!tipoMap[tipo]) tipoMap[tipo] = { qtd: 0, fat: 0 };
     tipoMap[tipo].qtd += 1;
-    tipoMap[tipo].fat += parseMonetary(row.valor_atribuido);
+    tipoMap[tipo].fat += getValorFaturavel(row);
   });
 
   const por_tipo = Object.entries(tipoMap)
@@ -276,7 +298,7 @@ function buildConsultasMetrics(
   realizadasRows.forEach((row) => {
     const modalidade = getDimensionLabel(row.modalidade_pagamento);
     if (!modalidadeMap[modalidade]) modalidadeMap[modalidade] = { fat: 0, qtd: 0 };
-    modalidadeMap[modalidade].fat += parseMonetary(row.valor_atribuido);
+    modalidadeMap[modalidade].fat += getValorFaturavel(row);
     modalidadeMap[modalidade].qtd += 1;
   });
 
@@ -286,8 +308,7 @@ function buildConsultasMetrics(
 
   const origemMap: Record<string, number> = {};
   agendadasRows.forEach((row) => {
-    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
-    const origem = contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+    const origem = getOrigem(row);
     origemMap[origem] = (origemMap[origem] ?? 0) + 1;
   });
 
@@ -373,9 +394,8 @@ function buildConsultasMetrics(
 
   const fatOrigemMap: Record<string, number> = {};
   realizadasRows.forEach((row) => {
-    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
-    const origem = contato ? getContatoOrigemAgrupada(contato) : "Não definido";
-    fatOrigemMap[origem] = (fatOrigemMap[origem] ?? 0) + parseMonetary(row.valor_atribuido);
+    const origem = getOrigem(row);
+    fatOrigemMap[origem] = (fatOrigemMap[origem] ?? 0) + getValorFaturavel(row);
   });
   const faturamento_por_origem = Object.entries(fatOrigemMap)
     .map(([name, value]) => ({ name, value }))
@@ -400,8 +420,9 @@ function buildConsultasMetrics(
           )
         : "Não definido",
       etapa: getDimensionLabel(row.etapa_no_crm),
-      valor: parseMonetary(row.valor_atribuido),
-      pago: Boolean(row.data_pagamento),
+      valor: getValorFaturavel(row),
+      pago: hasRecebimentoFinanceiro(row),
+      sem_cobranca: isRetornoSemCobranca(row.forma_pagamento),
     }));
 
   const funil_registros: FunnelStageDrilldownRecord[] = [...rows]
@@ -415,18 +436,20 @@ function buildConsultasMetrics(
         etapa: getDimensionLabel(row.etapa_no_crm),
         dataAgendamento: row.data_agendamento ?? "—",
         responsavel: getDimensionLabel(row.responsavel),
-        valor: parseMonetary(row.valor_atribuido),
+        valor: getValorFaturavel(row),
         dataReferencia: getRowDateByMode(row, tipoData),
         detalhes: [
           getDimensionLabel(row.tipo_consulta),
           getDimensionLabel(row.modalidade_pagamento),
+          ...(isRetornoSemCobranca(row.forma_pagamento) ? [RETORNO_AGENDA_TAG] : []),
           contato ? getContatoOrigemAgrupada(contato) : "Não definido",
         ],
         meta: {
           tipo: getDimensionLabel(row.tipo_consulta),
           modalidade: getDimensionLabel(row.modalidade_pagamento),
           origem: contato ? getContatoOrigemAgrupada(contato) : "Não definido",
-          pago: Boolean(row.data_pagamento),
+          pago: hasRecebimentoFinanceiro(row),
+          semCobranca: isRetornoSemCobranca(row.forma_pagamento),
           agendadaBase: !ETAPAS_EXCLUIDAS_AGENDAMENTO.has(
             normalizeStage(row.etapa_no_crm)
           ),
@@ -449,6 +472,9 @@ function buildConsultasMetrics(
     pago_no_dia_pct,
     prazo_medio,
     funil,
+    motivos_perda,
+    perdas_diagnostico,
+    perdas_por_origem,
     por_tipo,
     por_modalidade,
     por_origem,
@@ -478,13 +504,13 @@ export function useConsultasData() {
   );
 
   const { data: allRows = [], isLoading: loadingMain } = useQuery({
-    queryKey: ["consultas_all"],
+    queryKey: ["consultas_all_v2"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("consultas")
         .select(
           "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, tipo_consulta, " +
-            "modalidade_pagamento, forma_pagamento, data_criacao_card, " +
+            "modalidade_pagamento, forma_pagamento, tag_id_card, data_criacao_card, " +
             "data_agendamento, data_pagamento, valor_atribuido"
         );
 
@@ -602,6 +628,8 @@ export function useConsultasData() {
           pago_qtd: current.pago_qtd,
           pago_no_dia_pct: current.pago_no_dia_pct,
           prazo_medio: current.prazo_medio,
+          perdas_sem_motivo_pct: current.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: current.perdas_diagnostico.semRetornoPct,
           conversao_espirometria: current.conversao_espirometria,
           conversao_broncoscopia: current.conversao_broncoscopia,
           conversao_cirurgia: current.conversao_cirurgia,
@@ -618,6 +646,8 @@ export function useConsultasData() {
           pago_qtd: previous.pago_qtd,
           pago_no_dia_pct: previous.pago_no_dia_pct,
           prazo_medio: previous.prazo_medio,
+          perdas_sem_motivo_pct: previous.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: previous.perdas_diagnostico.semRetornoPct,
           conversao_espirometria: previous.conversao_espirometria,
           conversao_broncoscopia: previous.conversao_broncoscopia,
           conversao_cirurgia: previous.conversao_cirurgia,
@@ -637,6 +667,14 @@ export function useConsultasData() {
         funil: buildMetricComparison(
           sumByNumberKey(current.funil, "value"),
           sumByNumberKey(previous.funil, "value")
+        ),
+        motivos_perda: buildMetricComparison(
+          sumByNumberKey(current.motivos_perda, "value"),
+          sumByNumberKey(previous.motivos_perda, "value")
+        ),
+        perdas_por_origem: buildMetricComparison(
+          sumByNumberKey(current.perdas_por_origem, "value"),
+          sumByNumberKey(previous.perdas_por_origem, "value")
         ),
         por_tipo: buildMetricComparison(
           sumByNumberKey(current.por_tipo, "qtd"),

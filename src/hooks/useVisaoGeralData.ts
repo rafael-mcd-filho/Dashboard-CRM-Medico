@@ -9,7 +9,16 @@ import {
   getPreviousPeriodRange,
   sumByNumberKey,
 } from "@/lib/comparison";
-import { matchesSomenteAnunciosFilter } from "@/lib/contactOrigins";
+import {
+  getContatoOrigemAgrupada,
+  matchesSomenteAnunciosFilter,
+} from "@/lib/contactOrigins";
+import {
+  getValorFaturavel,
+  hasRecebimentoFinanceiro,
+  isRetornoSemCobranca,
+  RETORNO_AGENDA_TAG,
+} from "@/lib/billing";
 import {
   getRowDateByMode,
   isRowInDateModeRange,
@@ -17,6 +26,11 @@ import {
 } from "@/lib/dateMode";
 import { buildEvolucao } from "@/lib/evolucao";
 import type { FunnelStageDrilldownRecord } from "@/lib/funnelDrilldown";
+import {
+  buildCombinedLossOrigins,
+  buildCombinedLossReasons,
+  buildLossDiagnostics,
+} from "@/lib/lossReasons";
 import { calcDiffDias, isInDateRange, parseMonetary } from "@/lib/parse";
 
 type ContatoRow = {
@@ -33,6 +47,8 @@ type RowBase = {
   responsavel: string | null;
   etapa_no_crm: string | null;
   valor_atribuido: string | null;
+  forma_pagamento: string | null;
+  tag_id_card: string | null;
   data_criacao_card: string | null;
   data_pagamento: string | null;
   data_agendamento: string | null;
@@ -122,7 +138,7 @@ function getIntersectionSize(baseIds: Set<string>, compareIds: Set<string>) {
 }
 
 function calcPrazoMedio(rows: RowBase[]) {
-  const pagos = rows.filter((row) => Boolean(row.data_pagamento));
+  const pagos = rows.filter(hasRecebimentoFinanceiro);
   const diffs = pagos
     .map((row) => calcDiffDias(row.data_pagamento, row.data_agendamento))
     .filter((diff): diff is number => diff !== null && diff >= 0);
@@ -133,10 +149,12 @@ function calcPrazoMedio(rows: RowBase[]) {
 }
 
 function getPaidCount(rows: RowBase[]) {
-  return rows.filter((row) => Boolean(row.data_pagamento)).length;
+  return rows.filter(hasRecebimentoFinanceiro).length;
 }
 
 function getCirurgiaCost(row: CirurgiaRow) {
+  if (isRetornoSemCobranca(row.forma_pagamento)) return 0;
+
   return (
     parseMonetary(row.custo_anestesia) +
     parseMonetary(row.custo_comissao) +
@@ -147,7 +165,7 @@ function getCirurgiaCost(row: CirurgiaRow) {
 }
 
 function getCirurgiaValorLiquido(row: CirurgiaRow) {
-  return parseMonetary(row.valor_atribuido) - getCirurgiaCost(row);
+  return getValorFaturavel(row) - getCirurgiaCost(row);
 }
 
 function buildEvolucaoPorFunil(
@@ -205,7 +223,8 @@ function buildVisaoGeralMetrics(
   cirurgiaRows: CirurgiaRow[],
   dataInicio: Date,
   dataFim: Date,
-  tipoData: DashboardDateMode
+  tipoData: DashboardDateMode,
+  contatoOrigemMap: Map<string, ContatoRow>
 ) {
   const leads_novos = contatos.length;
 
@@ -269,7 +288,7 @@ function buildVisaoGeralMetrics(
       ? consultas_no_show_retorno / consultas_realizadas
       : 0;
   const fat_consultas = consultasRealizadasRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
 
@@ -277,7 +296,7 @@ function buildVisaoGeralMetrics(
   const espiro_realizadas = espiroRealizadasRows.length;
   const espiro_no_show = espiroNoShowRows.length;
   const fat_espiro = espiroRealizadasRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
 
@@ -286,7 +305,7 @@ function buildVisaoGeralMetrics(
   const bronco_no_show = broncoNoShowRows.length;
   const bronco_no_show_retorno = broncoNoShowRetornoRows.length;
   const fat_bronco = broncoRealizadasRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
 
@@ -301,7 +320,7 @@ function buildVisaoGeralMetrics(
       ? cirurgia_no_show_retorno / cirurgia_realizados
       : 0;
   const fat_cirurgia = cirurgiaRealizadasRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
   const vliq_cirurgia = cirurgiaRealizadasRows.reduce(
@@ -369,7 +388,7 @@ function buildVisaoGeralMetrics(
       const resp = (row.responsavel ?? "").trim() || "Não definido";
       if (!respRankMap[resp]) respRankMap[resp] = { realizados: 0, faturamento: 0 };
       respRankMap[resp].realizados += 1;
-      respRankMap[resp].faturamento += parseMonetary(row.valor_atribuido);
+      respRankMap[resp].faturamento += getValorFaturavel(row);
     });
   };
   addToRank(consultasRealizadasRows);
@@ -443,6 +462,24 @@ function buildVisaoGeralMetrics(
     },
   ];
 
+  const motivos_perda = buildCombinedLossReasons([
+    { funnel: "consultas", rows: consultaRows },
+    { funnel: "espirometria", rows: espiroRows },
+    { funnel: "broncoscopia", rows: broncoRows },
+    { funnel: "cirurgia", rows: cirurgiaRows },
+  ]);
+  const getOrigem = (row: RowBase) => {
+    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
+    return contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+  };
+  const perdas_diagnostico = buildLossDiagnostics(motivos_perda);
+  const perdas_por_origem = buildCombinedLossOrigins([
+    { rows: consultaRows, getOrigin: getOrigem },
+    { rows: espiroRows, getOrigin: getOrigem },
+    { rows: broncoRows, getOrigin: getOrigem },
+    { rows: cirurgiaRows, getOrigin: getOrigem },
+  ]);
+
   const evolucao_total = buildEvolucao(
     [
       ...consultasRealizadasRows,
@@ -489,12 +526,16 @@ function buildVisaoGeralMetrics(
         etapa: row.etapa_no_crm ?? "Não definido",
         dataAgendamento: row.data_agendamento ?? "—",
         responsavel: (row.responsavel ?? "").trim() || "Não definido",
-        valor: parseMonetary(row.valor_atribuido),
+        valor: getValorFaturavel(row),
         dataReferencia: getRowDateByMode(row, tipoData),
-        detalhes: [funnel],
+        detalhes: [
+          funnel,
+          ...(isRetornoSemCobranca(row.forma_pagamento) ? [RETORNO_AGENDA_TAG] : []),
+        ],
         meta: {
           funil: funnel,
           base: onlyRealizadas ? "realizadas" : "agendadas",
+          semCobranca: isRetornoSemCobranca(row.forma_pagamento),
         },
       }));
 
@@ -551,6 +592,9 @@ function buildVisaoGeralMetrics(
     fat_por_funil,
     volume_por_funil,
     cross_funnel,
+    motivos_perda,
+    perdas_diagnostico,
+    perdas_por_origem,
     evolucao_total,
     evolucao_por_funil,
     registros_funis,
@@ -572,12 +616,12 @@ export function useVisaoGeralData() {
   });
 
   const { data: allConsultaRows = [], isLoading: loadingConsultas } = useQuery({
-    queryKey: ["vg_consultas_all_v2"],
+    queryKey: ["vg_consultas_all_v4"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("consultas")
         .select(
-          "id, nome_contato, key, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
+          "id, nome_contato, key, responsavel, etapa_no_crm, valor_atribuido, forma_pagamento, tag_id_card, data_criacao_card, " +
             "data_pagamento, data_agendamento, contato_id"
         );
 
@@ -588,12 +632,12 @@ export function useVisaoGeralData() {
   });
 
   const { data: allEspiroRows = [], isLoading: loadingEspiro } = useQuery({
-    queryKey: ["vg_espirometria_all_v2"],
+    queryKey: ["vg_espirometria_all_v4"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("espirometria")
         .select(
-          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
+          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, forma_pagamento, tag_id_card, data_criacao_card, " +
             "data_pagamento, data_agendamento, contato_id"
         );
 
@@ -604,12 +648,12 @@ export function useVisaoGeralData() {
   });
 
   const { data: allBroncoRows = [], isLoading: loadingBronco } = useQuery({
-    queryKey: ["vg_broncoscopia_all_v2"],
+    queryKey: ["vg_broncoscopia_all_v4"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("broncoscopia")
         .select(
-          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
+          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, forma_pagamento, tag_id_card, data_criacao_card, " +
             "data_pagamento, data_agendamento, contato_id"
         );
 
@@ -620,12 +664,12 @@ export function useVisaoGeralData() {
   });
 
   const { data: allCirurgiaRows = [], isLoading: loadingCirurgia } = useQuery({
-    queryKey: ["vg_cirurgia_all_v3"],
+    queryKey: ["vg_cirurgia_all_v5"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("procedimentos_cirurgicos")
         .select(
-          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, data_criacao_card, " +
+          "id, nome_contato, responsavel, etapa_no_crm, valor_atribuido, forma_pagamento, tag_id_card, data_criacao_card, " +
             "data_pagamento, data_agendamento, contato_id, custo_anestesia, " +
             "custo_comissao, custo_hospital, custo_instrumentacao, impostos"
         );
@@ -680,7 +724,8 @@ export function useVisaoGeralData() {
       filterRowsByPeriod(allCirurgiaRows, dataInicio, dataFim),
       dataInicio,
       dataFim,
-      tipoData
+      tipoData,
+      contatoOrigemMap
     );
 
     const previous = buildVisaoGeralMetrics(
@@ -699,7 +744,8 @@ export function useVisaoGeralData() {
       ),
       previousRange.dataInicio,
       previousRange.dataFim,
-      tipoData
+      tipoData,
+      contatoOrigemMap
     );
 
     const comparisons = {
@@ -728,6 +774,8 @@ export function useVisaoGeralData() {
           conv_cirurgia: current.conv_cirurgia,
           fat_total: current.fat_total,
           prazo_medio_geral: current.prazo_medio_geral,
+          perdas_sem_motivo_pct: current.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: current.perdas_diagnostico.semRetornoPct,
           exames_realizados: current.exames_realizados,
           taxa_realizacao_global: current.taxa_realizacao_global,
         },
@@ -755,6 +803,8 @@ export function useVisaoGeralData() {
           conv_cirurgia: previous.conv_cirurgia,
           fat_total: previous.fat_total,
           prazo_medio_geral: previous.prazo_medio_geral,
+          perdas_sem_motivo_pct: previous.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: previous.perdas_diagnostico.semRetornoPct,
           exames_realizados: previous.exames_realizados,
           taxa_realizacao_global: previous.taxa_realizacao_global,
         }
@@ -767,6 +817,14 @@ export function useVisaoGeralData() {
         cross_funnel: buildMetricComparison(
           sumByNumberKey(current.cross_funnel, "value"),
           sumByNumberKey(previous.cross_funnel, "value")
+        ),
+        motivos_perda: buildMetricComparison(
+          sumByNumberKey(current.motivos_perda, "value"),
+          sumByNumberKey(previous.motivos_perda, "value")
+        ),
+        perdas_por_origem: buildMetricComparison(
+          sumByNumberKey(current.perdas_por_origem, "value"),
+          sumByNumberKey(previous.perdas_por_origem, "value")
         ),
         fat_por_funil: buildMetricComparison(
           sumByNumberKey(current.fat_por_funil, "value"),

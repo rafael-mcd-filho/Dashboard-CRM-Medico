@@ -6,13 +6,15 @@ import {
   format,
   startOfWeek,
 } from "date-fns";
+import { getValorFaturavel } from "@/lib/billing";
 import { getRowDateByMode, type DashboardDateMode } from "@/lib/dateMode";
-import { parseBRDate, parseMonetary } from "@/lib/parse";
+import { parseBRDate } from "@/lib/parse";
 
 type RowWithDate = {
   data_criacao_card: string | null;
   data_agendamento?: string | null;
   valor_atribuido: string | null;
+  forma_pagamento?: string | null;
 };
 
 /**
@@ -33,7 +35,7 @@ export function buildEvolucao(
       const d = parseBRDate(getRowDateByMode(r, tipoData));
       if (!d) return;
       const key = format(d, "yyyy-MM-dd");
-      map[key] = (map[key] ?? 0) + parseMonetary(r.valor_atribuido);
+      map[key] = (map[key] ?? 0) + getValorFaturavel(r);
     });
     return eachDayOfInterval({ start: dataInicio, end: dataFim }).map((d) => ({
       date: format(d, "dd/MM"),
@@ -47,7 +49,7 @@ export function buildEvolucao(
       const d = parseBRDate(getRowDateByMode(r, tipoData));
       if (!d) return;
       const key = format(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd");
-      map[key] = (map[key] ?? 0) + parseMonetary(r.valor_atribuido);
+      map[key] = (map[key] ?? 0) + getValorFaturavel(r);
     });
     return eachWeekOfInterval(
       { start: dataInicio, end: dataFim },
@@ -63,7 +65,7 @@ export function buildEvolucao(
     const d = parseBRDate(getRowDateByMode(r, tipoData));
     if (!d) return;
     const key = format(d, "yyyy-MM");
-    map[key] = (map[key] ?? 0) + parseMonetary(r.valor_atribuido);
+    map[key] = (map[key] ?? 0) + getValorFaturavel(r);
   });
   return eachMonthOfInterval({ start: dataInicio, end: dataFim }).map((m) => ({
     date: format(m, "MM/yyyy"),

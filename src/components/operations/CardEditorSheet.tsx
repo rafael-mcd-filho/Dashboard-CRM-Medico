@@ -24,6 +24,12 @@ import {
   type FunnelCardDraft,
   type UnifiedFunnelCard,
 } from "@/lib/funnelCards";
+import {
+  hasRecebimentoFinanceiro,
+  isRetornoSemCobranca,
+  RETORNO_SEM_COBRANCA,
+  SEM_COBRANCA_STATUS,
+} from "@/lib/billing";
 import { cn } from "@/lib/utils";
 
 type CardEditorSheetMode = "view" | "edit";
@@ -122,6 +128,8 @@ export function CardEditorSheet({
   const editableTone = isEditMode ? "editable" : "readonly";
   const isBroncoscopia = draft.funnel === "broncoscopia";
   const isProcedimento = draft.funnel === "cirurgia";
+  const isSemCobranca = isRetornoSemCobranca(draft.forma_pagamento);
+  const hasPagamentoFinanceiro = hasRecebimentoFinanceiro(draft);
 
   const updateField = <K extends keyof FunnelCardDraft>(
     field: K,
@@ -202,10 +210,16 @@ export function CardEditorSheet({
                   Pagamento
                 </p>
                 <p className="mt-3 text-base font-semibold text-[#0F1923]">
-                  {card.data_pagamento ? "Pago" : "Pendente"}
+                  {isSemCobranca
+                    ? SEM_COBRANCA_STATUS
+                    : hasPagamentoFinanceiro
+                      ? "Pago"
+                      : "Pendente"}
                 </p>
                 <p className="mt-1 text-[12px] text-[#5C6B7A]">
-                  {emptyLabel(card.data_pagamento, "Sem data de pagamento")}
+                  {isSemCobranca
+                    ? RETORNO_SEM_COBRANCA
+                    : emptyLabel(card.data_pagamento, "Sem data de pagamento")}
                 </p>
               </div>
             </div>
@@ -294,6 +308,9 @@ export function CardEditorSheet({
                         <SelectItem value="PIX">PIX</SelectItem>
                         <SelectItem value="Cartão">Cartão</SelectItem>
                         <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                        <SelectItem value={RETORNO_SEM_COBRANCA}>
+                          {RETORNO_SEM_COBRANCA}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (

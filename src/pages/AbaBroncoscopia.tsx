@@ -21,12 +21,15 @@ import {
 import { CrossFunnelPanel } from "@/components/dashboard/CrossFunnelPanel";
 import { FunnelStageSheet } from "@/components/dashboard/FunnelStageSheet";
 import { HeroMetricCard } from "@/components/dashboard/HeroMetricCard";
+import { LossDiagnosticsPanel } from "@/components/dashboard/LossDiagnosticsPanel";
+import { LossReasonsPanel } from "@/components/dashboard/LossReasonsPanel";
 import { PanelTitle } from "@/components/dashboard/PanelTitle";
 import { PerformancePanel } from "@/components/dashboard/PerformancePanel";
 import { RecordsDrilldownSheet } from "@/components/dashboard/RecordsDrilldownSheet";
 import { RecebimentoPanel } from "@/components/dashboard/RecebimentoPanel";
 import { useFilters } from "@/contexts/FiltersContext";
 import { useBroncoscopiaData } from "@/hooks/useBroncoscopiaData";
+import { SEM_COBRANCA_STATUS } from "@/lib/billing";
 import { getDateModeLabel } from "@/lib/dateMode";
 import { getEvolucaoBucketLabel } from "@/lib/evolucao";
 import type { FunnelStageDrilldownRecord } from "@/lib/funnelDrilldown";
@@ -351,6 +354,22 @@ export default function AbaBroncoscopia() {
             </BarChart>
           </ResponsiveContainer>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <LossReasonsPanel
+          items={d.motivos_perda}
+          comparison={d.comparisons?.charts.motivos_perda}
+          isLoading={d.isLoading}
+        />
+        <LossDiagnosticsPanel
+          diagnostics={d.perdas_diagnostico}
+          originItems={d.perdas_por_origem}
+          isLoading={d.isLoading}
+          unmappedComparison={d.comparisons?.kpis.perdas_sem_motivo_pct}
+          semRetornoComparison={d.comparisons?.kpis.perdas_sem_retorno_pct}
+          originsComparison={d.comparisons?.charts.perdas_por_origem}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -799,7 +818,11 @@ export default function AbaBroncoscopia() {
                         {row.valor > 0 ? fmtBRL(row.valor) : "—"}
                       </td>
                       <td className="px-4 py-2.5 text-center">
-                        {row.pago ? (
+                        {row.sem_cobranca ? (
+                          <span className="rounded-full bg-[#EEF4FF] px-2 py-0.5 text-[11px] font-medium text-clinic-blue">
+                            {SEM_COBRANCA_STATUS}
+                          </span>
+                        ) : row.pago ? (
                           <CheckCircle2 className="inline h-4 w-4 text-clinic-green" />
                         ) : (
                           <XCircle className="inline h-4 w-4 text-[#DDE3EA]" />

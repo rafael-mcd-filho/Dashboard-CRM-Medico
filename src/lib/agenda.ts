@@ -87,6 +87,8 @@ export type AgendaEvent = {
   responsible: string;
   stage: string;
   modality: string;
+  paymentForm: string;
+  isRetorno: boolean;
   typeLabel: string | null;
   amount: number;
   origin: string;

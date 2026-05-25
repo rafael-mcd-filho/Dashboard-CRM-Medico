@@ -18,9 +18,20 @@ import {
   isRowInDateModeRange,
   type DashboardDateMode,
 } from "@/lib/dateMode";
+import {
+  getValorFaturavel,
+  hasRecebimentoFinanceiro,
+  isRetornoSemCobranca,
+  RETORNO_AGENDA_TAG,
+} from "@/lib/billing";
 import { buildEvolucao } from "@/lib/evolucao";
 import type { FunnelStageDrilldownRecord } from "@/lib/funnelDrilldown";
-import { calcDiffDias, parseMonetary } from "@/lib/parse";
+import {
+  buildLossDiagnostics,
+  buildLossOrigins,
+  buildLossReasons,
+} from "@/lib/lossReasons";
+import { calcDiffDias } from "@/lib/parse";
 
 type BroncoscopiaRow = {
   id: string;
@@ -31,6 +42,7 @@ type BroncoscopiaRow = {
   tipo_paciente: string | null;
   modalidade_pagamento: string | null;
   forma_pagamento: string | null;
+  tag_id_card: string | null;
   quantidade_codigos: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
@@ -146,6 +158,9 @@ function buildBroncoscopiaMetrics(
   const realizadasRows = agendadasRows.filter((row) =>
     ETAPAS_REALIZADAS.has(normalizeStage(row.etapa_no_crm))
   );
+  const realizadasFaturaveisRows = realizadasRows.filter(
+    (row) => !isRetornoSemCobranca(row.forma_pagamento)
+  );
 
   const noShowRows = agendadasRows.filter(
     (row) => normalizeStage(row.etapa_no_crm) === ETAPA_NO_SHOW
@@ -169,15 +184,15 @@ function buildBroncoscopiaMetrics(
     base_contatos > 0 ? conversao_consulta / base_contatos : 0;
 
   const faturamento = realizadasRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
 
-  const contatosRealizados = getUniqueContatoIds(realizadasRows);
+  const contatosRealizados = getUniqueContatoIds(realizadasFaturaveisRows);
   const ticket_medio =
     contatosRealizados.size > 0 ? faturamento / contatosRealizados.size : 0;
 
-  const pagos = agendadasRows.filter((row) => Boolean(row.data_pagamento));
+  const pagos = agendadasRows.filter(hasRecebimentoFinanceiro);
   const pago_qtd = pagos.length;
   const pago_no_dia = pagos.filter(
     (row) =>
@@ -212,6 +227,13 @@ function buildBroncoscopiaMetrics(
     .map(([name, value]) => ({ name, value }));
 
   const funil = [...orderedStages, ...extraStages];
+  const motivos_perda = buildLossReasons(rows, "broncoscopia");
+  const getOrigem = (row: BroncoscopiaRow) => {
+    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
+    return contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+  };
+  const perdas_diagnostico = buildLossDiagnostics(motivos_perda);
+  const perdas_por_origem = buildLossOrigins(rows, getOrigem);
 
   const porTipoPacienteMap: Record<string, number> = {};
   agendadasRows.forEach((row) => {
@@ -229,7 +251,7 @@ function buildBroncoscopiaMetrics(
     if (!porModalidadeMap[modalidade]) {
       porModalidadeMap[modalidade] = { fat: 0, qtd: 0 };
     }
-    porModalidadeMap[modalidade].fat += parseMonetary(row.valor_atribuido);
+    porModalidadeMap[modalidade].fat += getValorFaturavel(row);
     porModalidadeMap[modalidade].qtd += 1;
   });
 
@@ -239,8 +261,7 @@ function buildBroncoscopiaMetrics(
 
   const porOrigemMap: Record<string, number> = {};
   agendadasRows.forEach((row) => {
-    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
-    const origem = contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+    const origem = getOrigem(row);
     porOrigemMap[origem] = (porOrigemMap[origem] ?? 0) + 1;
   });
 
@@ -287,8 +308,9 @@ function buildBroncoscopiaMetrics(
         origem: contato ? getContatoOrigemAgrupada(contato) : "Não definido",
         qtd_codigos: getDimensionLabel(row.quantidade_codigos),
         etapa: getDimensionLabel(row.etapa_no_crm),
-        valor: parseMonetary(row.valor_atribuido),
-        pago: Boolean(row.data_pagamento),
+        valor: getValorFaturavel(row),
+        pago: hasRecebimentoFinanceiro(row),
+        sem_cobranca: isRetornoSemCobranca(row.forma_pagamento),
         convertida: row.contato_id ? consultaContatoIds.has(row.contato_id) : false,
       };
     });
@@ -304,11 +326,12 @@ function buildBroncoscopiaMetrics(
         etapa: getDimensionLabel(row.etapa_no_crm),
         dataAgendamento: row.data_agendamento ?? "—",
         responsavel: getDimensionLabel(row.responsavel),
-        valor: parseMonetary(row.valor_atribuido),
+        valor: getValorFaturavel(row),
         dataReferencia: getRowDateByMode(row, tipoData),
         detalhes: [
           getDimensionLabel(row.tipo_paciente),
           getDimensionLabel(row.modalidade_pagamento),
+          ...(isRetornoSemCobranca(row.forma_pagamento) ? [RETORNO_AGENDA_TAG] : []),
           `Cód. ${getDimensionLabel(row.quantidade_codigos)}`,
           contato ? getContatoOrigemAgrupada(contato) : "Não definido",
         ],
@@ -317,7 +340,8 @@ function buildBroncoscopiaMetrics(
           modalidade: getDimensionLabel(row.modalidade_pagamento),
           codigos: getDimensionLabel(row.quantidade_codigos),
           origem: contato ? getContatoOrigemAgrupada(contato) : "Não definido",
-          pago: Boolean(row.data_pagamento),
+          pago: hasRecebimentoFinanceiro(row),
+          semCobranca: isRetornoSemCobranca(row.forma_pagamento),
           agendadaBase: !ETAPAS_EXCLUIDAS_AGENDAMENTO.has(
             normalizeStage(row.etapa_no_crm)
           ),
@@ -343,6 +367,9 @@ function buildBroncoscopiaMetrics(
     pago_no_dia_pct,
     prazo_medio,
     funil,
+    motivos_perda,
+    perdas_diagnostico,
+    perdas_por_origem,
     por_tipo_paciente,
     por_modalidade,
     por_origem,
@@ -364,13 +391,13 @@ export function useBroncoscopiaData() {
   );
 
   const { data: allRows = [], isLoading: loadingMain } = useQuery({
-    queryKey: ["broncoscopia_all_v2"],
+    queryKey: ["broncoscopia_all_v3"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("broncoscopia")
         .select(
           "id, contato_id, nome_contato, responsavel, etapa_no_crm, tipo_paciente, " +
-            "modalidade_pagamento, forma_pagamento, quantidade_codigos, data_criacao_card, " +
+            "modalidade_pagamento, forma_pagamento, tag_id_card, quantidade_codigos, data_criacao_card, " +
             "data_agendamento, data_pagamento, valor_atribuido"
         );
 
@@ -476,6 +503,8 @@ export function useBroncoscopiaData() {
           pago_qtd: current.pago_qtd,
           pago_no_dia_pct: current.pago_no_dia_pct,
           prazo_medio: current.prazo_medio,
+          perdas_sem_motivo_pct: current.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: current.perdas_diagnostico.semRetornoPct,
           taxa_conversao: current.taxa_conversao,
         },
         {
@@ -489,6 +518,8 @@ export function useBroncoscopiaData() {
           pago_qtd: previous.pago_qtd,
           pago_no_dia_pct: previous.pago_no_dia_pct,
           prazo_medio: previous.prazo_medio,
+          perdas_sem_motivo_pct: previous.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: previous.perdas_diagnostico.semRetornoPct,
           taxa_conversao: previous.taxa_conversao,
         }
       ),
@@ -496,6 +527,14 @@ export function useBroncoscopiaData() {
         funil: buildMetricComparison(
           sumByNumberKey(current.funil, "value"),
           sumByNumberKey(previous.funil, "value")
+        ),
+        motivos_perda: buildMetricComparison(
+          sumByNumberKey(current.motivos_perda, "value"),
+          sumByNumberKey(previous.motivos_perda, "value")
+        ),
+        perdas_por_origem: buildMetricComparison(
+          sumByNumberKey(current.perdas_por_origem, "value"),
+          sumByNumberKey(previous.perdas_por_origem, "value")
         ),
         comparativo_tipo_paciente: buildMetricComparison(
           sumByNumberKey(current.por_tipo_paciente, "value"),

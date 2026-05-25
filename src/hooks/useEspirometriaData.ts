@@ -18,9 +18,20 @@ import {
   isRowInDateModeRange,
   type DashboardDateMode,
 } from "@/lib/dateMode";
+import {
+  getValorFaturavel,
+  hasRecebimentoFinanceiro,
+  isRetornoSemCobranca,
+  RETORNO_AGENDA_TAG,
+} from "@/lib/billing";
 import { buildEvolucao } from "@/lib/evolucao";
 import type { FunnelStageDrilldownRecord } from "@/lib/funnelDrilldown";
-import { calcDiffDias, parseMonetary } from "@/lib/parse";
+import {
+  buildLossDiagnostics,
+  buildLossOrigins,
+  buildLossReasons,
+} from "@/lib/lossReasons";
+import { calcDiffDias } from "@/lib/parse";
 
 type EspirometriaRow = {
   id: string;
@@ -30,6 +41,7 @@ type EspirometriaRow = {
   etapa_no_crm: string | null;
   modalidade_pagamento: string | null;
   forma_pagamento: string | null;
+  tag_id_card: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
   data_pagamento: string | null;
@@ -131,6 +143,9 @@ function buildEspirometriaMetrics(
   const realizadasRows = agendadasRows.filter((row) =>
     ETAPAS_REALIZADAS.has(normalizeStage(row.etapa_no_crm))
   );
+  const realizadasFaturaveisRows = realizadasRows.filter(
+    (row) => !isRetornoSemCobranca(row.forma_pagamento)
+  );
 
   const noShowRows = agendadasRows.filter(
     (row) => normalizeStage(row.etapa_no_crm) === ETAPA_NO_SHOW
@@ -148,15 +163,15 @@ function buildEspirometriaMetrics(
     base_contatos > 0 ? conversao_consulta / base_contatos : 0;
 
   const faturamento = realizadasRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
 
-  const contatosRealizados = getUniqueContatoIds(realizadasRows);
+  const contatosRealizados = getUniqueContatoIds(realizadasFaturaveisRows);
   const ticket_medio =
     contatosRealizados.size > 0 ? faturamento / contatosRealizados.size : 0;
 
-  const pagos = agendadasRows.filter((row) => Boolean(row.data_pagamento));
+  const pagos = agendadasRows.filter(hasRecebimentoFinanceiro);
   const pago_qtd = pagos.length;
   const pago_no_dia = pagos.filter(
     (row) =>
@@ -191,6 +206,13 @@ function buildEspirometriaMetrics(
     .map(([name, value]) => ({ name, value }));
 
   const funil = [...orderedStages, ...extraStages];
+  const motivos_perda = buildLossReasons(rows, "espirometria");
+  const getOrigem = (row: EspirometriaRow) => {
+    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
+    return contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+  };
+  const perdas_diagnostico = buildLossDiagnostics(motivos_perda);
+  const perdas_por_origem = buildLossOrigins(rows, getOrigem);
 
   const porModalidadeMap: Record<string, { fat: number; qtd: number }> = {};
   realizadasRows.forEach((row) => {
@@ -198,7 +220,7 @@ function buildEspirometriaMetrics(
     if (!porModalidadeMap[modalidade]) {
       porModalidadeMap[modalidade] = { fat: 0, qtd: 0 };
     }
-    porModalidadeMap[modalidade].fat += parseMonetary(row.valor_atribuido);
+    porModalidadeMap[modalidade].fat += getValorFaturavel(row);
     porModalidadeMap[modalidade].qtd += 1;
   });
 
@@ -208,8 +230,7 @@ function buildEspirometriaMetrics(
 
   const porOrigemMap: Record<string, number> = {};
   agendadasRows.forEach((row) => {
-    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
-    const origem = contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+    const origem = getOrigem(row);
     porOrigemMap[origem] = (porOrigemMap[origem] ?? 0) + 1;
   });
 
@@ -223,9 +244,8 @@ function buildEspirometriaMetrics(
 
   const fatOrigemMap: Record<string, number> = {};
   realizadasRows.forEach((row) => {
-    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
-    const origem = contato ? getContatoOrigemAgrupada(contato) : "Não definido";
-    fatOrigemMap[origem] = (fatOrigemMap[origem] ?? 0) + parseMonetary(row.valor_atribuido);
+    const origem = getOrigem(row);
+    fatOrigemMap[origem] = (fatOrigemMap[origem] ?? 0) + getValorFaturavel(row);
   });
   const faturamento_por_origem = Object.entries(fatOrigemMap)
     .map(([name, value]) => ({ name, value }))
@@ -245,8 +265,9 @@ function buildEspirometriaMetrics(
         forma_pagamento: row.forma_pagamento ?? "—",
         origem: contato ? getContatoOrigemAgrupada(contato) : "Não definido",
         etapa: getDimensionLabel(row.etapa_no_crm),
-        valor: parseMonetary(row.valor_atribuido),
-        pago: Boolean(row.data_pagamento),
+        valor: getValorFaturavel(row),
+        pago: hasRecebimentoFinanceiro(row),
+        sem_cobranca: isRetornoSemCobranca(row.forma_pagamento),
         convertida: row.contato_id ? consultaContatoIds.has(row.contato_id) : false,
       };
     });
@@ -262,16 +283,18 @@ function buildEspirometriaMetrics(
         etapa: getDimensionLabel(row.etapa_no_crm),
         dataAgendamento: row.data_agendamento ?? "—",
         responsavel: getDimensionLabel(row.responsavel),
-        valor: parseMonetary(row.valor_atribuido),
+        valor: getValorFaturavel(row),
         dataReferencia: getRowDateByMode(row, tipoData),
         detalhes: [
           getDimensionLabel(row.modalidade_pagamento),
+          ...(isRetornoSemCobranca(row.forma_pagamento) ? [RETORNO_AGENDA_TAG] : []),
           contato ? getContatoOrigemAgrupada(contato) : "Não definido",
         ],
         meta: {
           modalidade: getDimensionLabel(row.modalidade_pagamento),
           origem: contato ? getContatoOrigemAgrupada(contato) : "Não definido",
-          pago: Boolean(row.data_pagamento),
+          pago: hasRecebimentoFinanceiro(row),
+          semCobranca: isRetornoSemCobranca(row.forma_pagamento),
           agendadaBase: !ETAPAS_EXCLUIDAS_AGENDAMENTO.has(
             normalizeStage(row.etapa_no_crm)
           ),
@@ -295,6 +318,9 @@ function buildEspirometriaMetrics(
     pago_no_dia_pct,
     prazo_medio,
     funil,
+    motivos_perda,
+    perdas_diagnostico,
+    perdas_por_origem,
     por_modalidade,
     por_origem,
     evolucao,
@@ -314,13 +340,13 @@ export function useEspirometriaData() {
   );
 
   const { data: allRows = [], isLoading: loadingMain } = useQuery({
-    queryKey: ["espirometria_all_v2"],
+    queryKey: ["espirometria_all_v3"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("espirometria")
         .select(
           "id, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, " +
-            "forma_pagamento, data_criacao_card, data_agendamento, data_pagamento, valor_atribuido"
+            "forma_pagamento, tag_id_card, data_criacao_card, data_agendamento, data_pagamento, valor_atribuido"
         );
 
       if (error) throw error;
@@ -425,6 +451,8 @@ export function useEspirometriaData() {
           pago_qtd: current.pago_qtd,
           pago_no_dia_pct: current.pago_no_dia_pct,
           prazo_medio: current.prazo_medio,
+          perdas_sem_motivo_pct: current.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: current.perdas_diagnostico.semRetornoPct,
           taxa_conversao: current.taxa_conversao,
         },
         {
@@ -438,6 +466,8 @@ export function useEspirometriaData() {
           pago_qtd: previous.pago_qtd,
           pago_no_dia_pct: previous.pago_no_dia_pct,
           prazo_medio: previous.prazo_medio,
+          perdas_sem_motivo_pct: previous.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: previous.perdas_diagnostico.semRetornoPct,
           taxa_conversao: previous.taxa_conversao,
         }
       ),
@@ -445,6 +475,14 @@ export function useEspirometriaData() {
         funil: buildMetricComparison(
           sumByNumberKey(current.funil, "value"),
           sumByNumberKey(previous.funil, "value")
+        ),
+        motivos_perda: buildMetricComparison(
+          sumByNumberKey(current.motivos_perda, "value"),
+          sumByNumberKey(previous.motivos_perda, "value")
+        ),
+        perdas_por_origem: buildMetricComparison(
+          sumByNumberKey(current.perdas_por_origem, "value"),
+          sumByNumberKey(previous.perdas_por_origem, "value")
         ),
         por_modalidade: buildMetricComparison(
           sumByNumberKey(current.por_modalidade, "fat"),

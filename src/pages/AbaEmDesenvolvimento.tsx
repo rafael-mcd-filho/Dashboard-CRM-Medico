@@ -56,8 +56,15 @@ import {
   type FunnelCardKey,
   type UnifiedFunnelCard,
 } from "@/lib/funnelCards";
+import {
+  getValorFaturavel,
+  hasRecebimentoFinanceiro,
+  isRetornoSemCobranca,
+  RETORNO_SEM_COBRANCA,
+  SEM_COBRANCA_STATUS,
+} from "@/lib/billing";
 import { fmtBRL, fmtNum } from "@/lib/fmt";
-import { parseBRDate, parseMonetary } from "@/lib/parse";
+import { parseBRDate } from "@/lib/parse";
 import { useRouteAccess } from "@/lib/routeAccess";
 
 const PAGE_SIZE = 25;
@@ -353,11 +360,14 @@ export default function AbaEmDesenvolvimento() {
         return false;
       }
 
-      if (paymentFilter === "paid" && !card.data_pagamento) {
+      const isSemCobranca = isRetornoSemCobranca(card.forma_pagamento);
+      const hasPagamentoFinanceiro = hasRecebimentoFinanceiro(card);
+
+      if (paymentFilter === "paid" && !hasPagamentoFinanceiro) {
         return false;
       }
 
-      if (paymentFilter === "unpaid" && card.data_pagamento) {
+      if (paymentFilter === "unpaid" && (hasPagamentoFinanceiro || isSemCobranca)) {
         return false;
       }
 
@@ -436,7 +446,7 @@ export default function AbaEmDesenvolvimento() {
   const totalValue = useMemo(
     () =>
       filteredCards.reduce(
-        (sum, card) => sum + parseMonetary(card.valor_atribuido),
+        (sum, card) => sum + getValorFaturavel(card),
         0
       ),
     [filteredCards]
@@ -805,7 +815,9 @@ export default function AbaEmDesenvolvimento() {
                 {paginatedCards.map((card) => {
                   const meta = FUNNEL_CARD_META[card.funnel];
                   const typeValue = getCardTypeValue(card);
-                  const parsedValue = parseMonetary(card.valor_atribuido);
+                  const parsedValue = getValorFaturavel(card);
+                  const isSemCobranca = isRetornoSemCobranca(card.forma_pagamento);
+                  const hasPagamentoFinanceiro = hasRecebimentoFinanceiro(card);
 
                   return (
                     <TableRow key={card.id} className="border-[#EEF2F6]">
@@ -853,15 +865,23 @@ export default function AbaEmDesenvolvimento() {
                         <div className="flex flex-col gap-1">
                           <span
                             className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                              card.data_pagamento
+                              isSemCobranca
+                                ? "bg-[#EEF4FF] text-clinic-blue"
+                                : hasPagamentoFinanceiro
                                 ? "bg-[#ECFDF3] text-[#047857]"
                                 : "bg-[#FFF4E8] text-[#B45309]"
                             }`}
                           >
-                            {card.data_pagamento ? "Pago" : "Pendente"}
+                            {isSemCobranca
+                              ? SEM_COBRANCA_STATUS
+                              : hasPagamentoFinanceiro
+                                ? "Pago"
+                                : "Pendente"}
                           </span>
                           <span className="text-[12px] text-[#7C8B99]">
-                            {card.data_pagamento || "Sem data"}
+                            {isSemCobranca
+                              ? RETORNO_SEM_COBRANCA
+                              : card.data_pagamento || "Sem data"}
                           </span>
                         </div>
                       </TableCell>

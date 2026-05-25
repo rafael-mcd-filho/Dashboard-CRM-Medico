@@ -18,7 +18,18 @@ import {
   isRowInDateModeRange,
   type DashboardDateMode,
 } from "@/lib/dateMode";
+import {
+  getValorFaturavel,
+  hasRecebimentoFinanceiro,
+  isRetornoSemCobranca,
+  RETORNO_AGENDA_TAG,
+} from "@/lib/billing";
 import type { FunnelStageDrilldownRecord } from "@/lib/funnelDrilldown";
+import {
+  buildLossDiagnostics,
+  buildLossOrigins,
+  buildLossReasons,
+} from "@/lib/lossReasons";
 import { calcDiffDias, parseMonetary } from "@/lib/parse";
 import { buildEvolucao } from "@/lib/evolucao";
 
@@ -31,6 +42,7 @@ type ProcRow = {
   tipo_paciente: string | null;
   modalidade_pagamento: string | null;
   forma_pagamento: string | null;
+  tag_id_card: string | null;
   data_criacao_card: string | null;
   data_agendamento: string | null;
   data_pagamento: string | null;
@@ -94,6 +106,16 @@ function getDimensionLabel(value: string | null | undefined) {
 }
 
 function getCostBreakdown(row: ProcRow) {
+  if (isRetornoSemCobranca(row.forma_pagamento)) {
+    return {
+      anestesia: 0,
+      comissao: 0,
+      hospital: 0,
+      impostos: 0,
+      instrumentacao: 0,
+    };
+  }
+
   return {
     anestesia: parseMonetary(row.custo_anestesia),
     comissao: parseMonetary(row.custo_comissao),
@@ -115,7 +137,7 @@ function custoRow(row: ProcRow) {
 }
 
 function valorLiquidoRow(row: ProcRow) {
-  return parseMonetary(row.valor_atribuido) - custoRow(row);
+  return getValorFaturavel(row) - custoRow(row);
 }
 
 function getUniqueContatoIds(rows: Array<{ contato_id: string | null }>) {
@@ -162,6 +184,9 @@ function buildProcedimentosMetrics(
   const realizadasRows = agendadosRows.filter((row) =>
     ETAPAS_REALIZADAS.has(normalizeStage(row.etapa_no_crm))
   );
+  const realizadasFaturaveisRows = realizadasRows.filter(
+    (row) => !isRetornoSemCobranca(row.forma_pagamento)
+  );
 
   const noShowConsultaRows = agendadosRows.filter(
     (row) => normalizeStage(row.etapa_no_crm) === ETAPA_NO_SHOW_CONSULTA
@@ -180,12 +205,12 @@ function buildProcedimentosMetrics(
   const no_show_retorno_pct = realizados > 0 ? no_show_retorno / realizados : 0;
 
   const fechados_valor = agendadosRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
 
   const faturamento = realizadasRows.reduce(
-    (sum, row) => sum + parseMonetary(row.valor_atribuido),
+    (sum, row) => sum + getValorFaturavel(row),
     0
   );
 
@@ -220,14 +245,17 @@ function buildProcedimentosMetrics(
     costTotals.impostos +
     costTotals.instrumentacao;
 
-  const custo_medio = realizados > 0 ? custo_total / realizados : 0;
+  const custo_medio =
+    realizadasFaturaveisRows.length > 0
+      ? custo_total / realizadasFaturaveisRows.length
+      : 0;
   const margem_bruta = faturamento - custo_total;
 
-  const pacientesRealizados = getUniqueContatoIds(realizadasRows);
+  const pacientesRealizados = getUniqueContatoIds(realizadasFaturaveisRows);
   const ticket_medio =
     pacientesRealizados.size > 0 ? faturamento / pacientesRealizados.size : 0;
 
-  const pagos = agendadosRows.filter((row) => Boolean(row.data_pagamento));
+  const pagos = agendadosRows.filter(hasRecebimentoFinanceiro);
   const pago_qtd = pagos.length;
   const pago_no_dia = pagos.filter(
     (row) =>
@@ -254,12 +282,19 @@ function buildProcedimentosMetrics(
     name: stage,
     value: etapaMap[stage],
   }));
+  const motivos_perda = buildLossReasons(rows, "cirurgia");
+  const getOrigem = (row: ProcRow) => {
+    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
+    return contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+  };
+  const perdas_diagnostico = buildLossDiagnostics(motivos_perda);
+  const perdas_por_origem = buildLossOrigins(rows, getOrigem);
 
   const por_tipoMap: Record<string, { fat: number; liq: number }> = {};
   realizadasRows.forEach((row) => {
     const tipo = getDimensionLabel(row.tipo_paciente);
     if (!por_tipoMap[tipo]) por_tipoMap[tipo] = { fat: 0, liq: 0 };
-    por_tipoMap[tipo].fat += parseMonetary(row.valor_atribuido);
+    por_tipoMap[tipo].fat += getValorFaturavel(row);
     por_tipoMap[tipo].liq += valorLiquidoRow(row);
   });
 
@@ -271,7 +306,7 @@ function buildProcedimentosMetrics(
   realizadasRows.forEach((row) => {
     const modalidade = getDimensionLabel(row.modalidade_pagamento);
     por_modalidadeMap[modalidade] =
-      (por_modalidadeMap[modalidade] ?? 0) + parseMonetary(row.valor_atribuido);
+      (por_modalidadeMap[modalidade] ?? 0) + getValorFaturavel(row);
   });
 
   const por_modalidade = Object.entries(por_modalidadeMap)
@@ -280,8 +315,7 @@ function buildProcedimentosMetrics(
 
   const por_origemMap: Record<string, number> = {};
   agendadosRows.forEach((row) => {
-    const contato = row.contato_id ? contatoOrigemMap.get(row.contato_id) : undefined;
-    const origem = contato ? getContatoOrigemAgrupada(contato) : "Não definido";
+    const origem = getOrigem(row);
     por_origemMap[origem] = (por_origemMap[origem] ?? 0) + 1;
   });
 
@@ -303,9 +337,10 @@ function buildProcedimentosMetrics(
 
   const ticketPorRespMap: Record<string, { fat: number; contatos: Set<string> }> = {};
   realizadasRows.forEach((row) => {
+    if (isRetornoSemCobranca(row.forma_pagamento)) return;
     const resp = (row.responsavel ?? "").trim() || "Não definido";
     if (!ticketPorRespMap[resp]) ticketPorRespMap[resp] = { fat: 0, contatos: new Set() };
-    ticketPorRespMap[resp].fat += parseMonetary(row.valor_atribuido);
+    ticketPorRespMap[resp].fat += getValorFaturavel(row);
     if (row.contato_id) ticketPorRespMap[resp].contatos.add(row.contato_id);
   });
   const ticket_por_responsavel = Object.entries(ticketPorRespMap)
@@ -334,10 +369,11 @@ function buildProcedimentosMetrics(
       modalidade: getDimensionLabel(row.modalidade_pagamento),
       forma_pagamento: row.forma_pagamento ?? "—",
       etapa: getDimensionLabel(row.etapa_no_crm),
-      valor_bruto: parseMonetary(row.valor_atribuido),
+      valor_bruto: getValorFaturavel(row),
       custo: custoRow(row),
       valor_liq: valorLiquidoRow(row),
-      pago: Boolean(row.data_pagamento),
+      pago: hasRecebimentoFinanceiro(row),
+      sem_cobranca: isRetornoSemCobranca(row.forma_pagamento),
     }));
 
   const funil_registros: FunnelStageDrilldownRecord[] = [...rows]
@@ -352,11 +388,12 @@ function buildProcedimentosMetrics(
         etapa: getDimensionLabel(row.etapa_no_crm),
         dataAgendamento: row.data_agendamento ?? "—",
         responsavel: getDimensionLabel(row.responsavel),
-        valor: parseMonetary(row.valor_atribuido),
+        valor: getValorFaturavel(row),
         dataReferencia: getRowDateByMode(row, tipoData),
         detalhes: [
           getDimensionLabel(row.tipo_paciente),
           getDimensionLabel(row.modalidade_pagamento),
+          ...(isRetornoSemCobranca(row.forma_pagamento) ? [RETORNO_AGENDA_TAG] : []),
           contato ? getContatoOrigemAgrupada(contato) : "Não definido",
         ],
         meta: {
@@ -374,7 +411,8 @@ function buildProcedimentosMetrics(
             normalizeStage(row.etapa_no_crm)
           ),
           realizada: ETAPAS_REALIZADAS.has(normalizeStage(row.etapa_no_crm)),
-          pago: Boolean(row.data_pagamento),
+          pago: hasRecebimentoFinanceiro(row),
+          semCobranca: isRetornoSemCobranca(row.forma_pagamento),
         },
       };
     });
@@ -404,6 +442,9 @@ function buildProcedimentosMetrics(
     pago_no_dia_pct,
     prazo_medio,
     funil,
+    motivos_perda,
+    perdas_diagnostico,
+    perdas_por_origem,
     por_tipo,
     por_modalidade,
     por_origem,
@@ -426,13 +467,13 @@ export function useProcedimentosData() {
   );
 
   const { data: allRows = [], isLoading: loadingMain } = useQuery({
-    queryKey: ["procedimentos_all_v4"],
+    queryKey: ["procedimentos_all_v5"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("procedimentos_cirurgicos")
         .select(
           "id, contato_id, nome_contato, responsavel, etapa_no_crm, tipo_paciente, " +
-            "modalidade_pagamento, forma_pagamento, data_criacao_card, " +
+            "modalidade_pagamento, forma_pagamento, tag_id_card, data_criacao_card, " +
             "data_agendamento, data_pagamento, valor_atribuido, " +
             "custo_anestesia, custo_comissao, custo_hospital, custo_instrumentacao, impostos"
         );
@@ -504,6 +545,8 @@ export function useProcedimentosData() {
           pago_no_dia: current.pago_no_dia,
           pago_no_dia_pct: current.pago_no_dia_pct,
           prazo_medio: current.prazo_medio,
+          perdas_sem_motivo_pct: current.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: current.perdas_diagnostico.semRetornoPct,
           taxa_conversao: current.taxa_conversao,
         },
         {
@@ -523,6 +566,8 @@ export function useProcedimentosData() {
           pago_no_dia: previous.pago_no_dia,
           pago_no_dia_pct: previous.pago_no_dia_pct,
           prazo_medio: previous.prazo_medio,
+          perdas_sem_motivo_pct: previous.perdas_diagnostico.unmappedPct,
+          perdas_sem_retorno_pct: previous.perdas_diagnostico.semRetornoPct,
           taxa_conversao: previous.taxa_conversao,
         }
       ),
@@ -542,6 +587,14 @@ export function useProcedimentosData() {
         funil: buildMetricComparison(
           sumByNumberKey(current.funil, "value"),
           sumByNumberKey(previous.funil, "value")
+        ),
+        motivos_perda: buildMetricComparison(
+          sumByNumberKey(current.motivos_perda, "value"),
+          sumByNumberKey(previous.motivos_perda, "value")
+        ),
+        perdas_por_origem: buildMetricComparison(
+          sumByNumberKey(current.perdas_por_origem, "value"),
+          sumByNumberKey(previous.perdas_por_origem, "value")
         ),
         por_tipo: buildMetricComparison(
           sumByNumberKey(current.por_tipo, "fat"),

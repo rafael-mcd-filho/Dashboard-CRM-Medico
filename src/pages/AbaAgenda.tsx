@@ -59,6 +59,7 @@ import {
   type AgendaTurnKey,
   type AgendaView,
 } from "@/lib/agenda";
+import { RETORNO_AGENDA_TAG } from "@/lib/billing";
 import { fmtBRL, fmtNum } from "@/lib/fmt";
 import { cn } from "@/lib/utils";
 
@@ -197,6 +198,11 @@ function AgendaEventCard({
               {fmtBRL(event.amount)}
             </span>
           ) : null}
+          {event.isRetorno ? (
+            <span className="rounded-full border border-[#D8E6FF] bg-[#EEF4FF] px-2 py-0.5 text-[10px] font-semibold text-clinic-blue">
+              {RETORNO_AGENDA_TAG}
+            </span>
+          ) : null}
           <span className="rounded-full bg-[#F7F9FB] px-2 py-0.5 text-[10px] font-medium text-[#5C6B7A]">
             {event.stage}
           </span>
@@ -314,6 +320,11 @@ function AgendaDetailSheet({
                   Anúncio
                 </span>
               ) : null}
+              {event.isRetorno ? (
+                <span className="rounded-full border border-[#D8E6FF] bg-[#EEF4FF] px-2.5 py-1 text-[11px] font-medium text-clinic-blue">
+                  {RETORNO_AGENDA_TAG}
+                </span>
+              ) : null}
             </div>
             <SheetTitle className="mt-3 text-xl text-[#0F1923]">
               {event.patientName}
@@ -330,6 +341,7 @@ function AgendaDetailSheet({
                 ["Responsável", event.responsible],
                 ["Etapa", event.stage],
                 ["Modalidade", event.modality],
+                ["Forma", event.paymentForm],
                 ["Origem", event.origin],
                 ["Tipo", event.typeLabel ?? "Não definido"],
                 ["Valor", event.amount > 0 ? fmtBRL(event.amount) : "—"],
@@ -632,6 +644,11 @@ function MonthAgendaView({
                               {event.amount > 0 ? (
                                 <p className="mt-0.5 text-[10px] font-semibold text-clinic-blue">
                                   {fmtBRL(event.amount)}
+                                </p>
+                              ) : null}
+                              {event.isRetorno ? (
+                                <p className="mt-0.5 text-[10px] font-semibold text-clinic-blue">
+                                  {RETORNO_AGENDA_TAG}
                                 </p>
                               ) : null}
                             </div>

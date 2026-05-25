@@ -15,7 +15,7 @@ import {
   type AgendaEvent,
   type AgendaFunnelKey,
 } from "@/lib/agenda";
-import { parseMonetary } from "@/lib/parse";
+import { getValorFaturavel, isRetornoSemCobranca } from "@/lib/billing";
 
 type BaseAgendaRow = {
   id: string;
@@ -25,6 +25,7 @@ type BaseAgendaRow = {
   responsavel: string | null;
   etapa_no_crm: string | null;
   modalidade_pagamento: string | null;
+  forma_pagamento: string | null;
   data_agendamento: string | null;
   horario_agendamento: string | null;
   valor_atribuido: string | null;
@@ -131,8 +132,10 @@ function mapAgendaEvent(
     responsible: getAgendaDisplayLabel(row.responsavel),
     stage: getAgendaDisplayLabel(row.etapa_no_crm),
     modality: getAgendaDisplayLabel(row.modalidade_pagamento),
+    paymentForm: getAgendaDisplayLabel(row.forma_pagamento),
+    isRetorno: isRetornoSemCobranca(row.forma_pagamento),
     typeLabel,
-    amount: parseMonetary(row.valor_atribuido),
+    amount: getValorFaturavel(row),
     origin,
     isAds,
     contactId: row.contato_id,
@@ -145,7 +148,7 @@ function mapAgendaEvent(
 
 export function useAgendaData() {
   const { data, isLoading } = useQuery({
-    queryKey: ["agenda_events_v1"],
+    queryKey: ["agenda_events_v2"],
     queryFn: async () => {
       const [
         consultas,
@@ -156,19 +159,19 @@ export function useAgendaData() {
       ] = await Promise.all([
         fetchAllRows<ConsultaAgendaRow>(
           "consultas",
-          "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, data_agendamento, horario_agendamento, valor_atribuido, link_da_conversa, id_do_card, descricao_card, tipo_consulta"
+          "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_agendamento, horario_agendamento, valor_atribuido, link_da_conversa, id_do_card, descricao_card, tipo_consulta"
         ),
         fetchAllRows<EspirometriaAgendaRow>(
           "espirometria",
-          "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, data_agendamento, horario_agendamento, valor_atribuido, link_da_conversa, id_do_card, descricao_card"
+          "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_agendamento, horario_agendamento, valor_atribuido, link_da_conversa, id_do_card, descricao_card"
         ),
         fetchAllRows<BroncoscopiaAgendaRow>(
           "broncoscopia",
-          "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, data_agendamento, horario_agendamento, valor_atribuido, link_da_conversa, id_do_card, descricao_card, tipo_paciente"
+          "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_agendamento, horario_agendamento, valor_atribuido, link_da_conversa, id_do_card, descricao_card, tipo_paciente"
         ),
         fetchAllRows<ProcedimentoAgendaRow>(
           "procedimentos_cirurgicos",
-          "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, data_agendamento, horario_agendamento, valor_atribuido, link_da_conversa, id_do_card, descricao_card, tipo_paciente"
+          "id, key, contato_id, nome_contato, responsavel, etapa_no_crm, modalidade_pagamento, forma_pagamento, data_agendamento, horario_agendamento, valor_atribuido, link_da_conversa, id_do_card, descricao_card, tipo_paciente"
         ),
         fetchAllRows<ContatoOrigemRow>(
           "contatos",
