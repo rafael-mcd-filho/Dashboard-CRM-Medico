@@ -1,9 +1,13 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import AccessConfigurationError from "@/components/auth/AccessConfigurationError";
 import AccessLoading from "@/components/auth/AccessLoading";
 import AccessDenied from "@/pages/AccessDenied";
+import {
+  AdminAreaFloatingSwitcher,
+  AdminAreaSelectionDialog,
+} from "@/components/auth/AdminAreaControls";
 import LocalAdminLoginDialog from "@/components/auth/LocalAdminLoginDialog";
 import {
   getAuthorizedUserIdFromSearch,
@@ -14,6 +18,11 @@ import {
   RouteAccessContext,
   type OperationsAccessRole,
 } from "@/lib/routeAccess";
+import {
+  consumeAdminAreaPromptPending,
+  isAdminEmail,
+  markAdminAreaPromptPending,
+} from "@/lib/adminAccess";
 import { supabase } from "@/integrations/supabase/client";
 
 type ProtectedAccessArea = "dashboard" | "operations";
@@ -37,11 +46,21 @@ type AccessViewState =
       userId: string | null;
       mode: "userid" | "account" | "operations";
     }
+  | { status: "redirect"; pathname: string; search?: string }
   | { status: "config-error"; details?: string };
 
 function isOperationsAccessRole(value: string | null | undefined): value is OperationsAccessRole {
   return value === "viewer" || value === "editor";
 }
+
+const isMissingRelationError = (
+  error: { code?: string | null; message?: string | null } | null,
+  relationName: string
+) =>
+  Boolean(
+    error &&
+      (error.code === "42P01" || error.message?.toLowerCase().includes(relationName))
+  );
 
 const ProtectedRoute = ({
   children,
@@ -52,6 +71,7 @@ const ProtectedRoute = ({
   const [access, setAccess] = useState<AccessViewState>({ status: "loading" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [adminAreaPromptOpen, setAdminAreaPromptOpen] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -98,14 +118,10 @@ const ProtectedRoute = ({
             .maybeSingle();
 
         if (operationsAccessError) {
-          const relationMissing =
-            operationsAccessError.code === "42P01" ||
-            operationsAccessError.message.toLowerCase().includes("operations_access");
-
           if (!ignore) {
             setAccess({
               status: "config-error",
-              details: relationMissing
+              details: isMissingRelationError(operationsAccessError, "operations_access")
                 ? "A tabela public.operations_access ainda nao esta disponivel no backend."
                 : operationsAccessError.message,
             });
@@ -118,6 +134,41 @@ const ProtectedRoute = ({
           : null;
 
         if (!operationsRole) {
+          let dashboardQuery = supabase
+            .from("dashboard_access")
+            .select("id")
+            .eq("active", true)
+            .limit(1);
+
+          if (requestedUserId) {
+            dashboardQuery = dashboardQuery.eq("external_userid", requestedUserId);
+          }
+
+          const { data: dashboardRows, error: dashboardError } = await dashboardQuery;
+
+          if (dashboardError) {
+            if (!ignore) {
+              setAccess({
+                status: "config-error",
+                details: isMissingRelationError(dashboardError, "dashboard_access")
+                  ? "A tabela public.dashboard_access ainda nao esta disponivel no backend."
+                  : dashboardError.message,
+              });
+            }
+            return;
+          }
+
+          if (dashboardRows && dashboardRows.length > 0) {
+            if (!ignore) {
+              setAccess({
+                status: "redirect",
+                pathname: "/visao-geral",
+                search: location.search,
+              });
+            }
+            return;
+          }
+
           if (!ignore) {
             setAccess({ status: "denied", userId: userEmail, mode: "operations" });
           }
@@ -180,14 +231,10 @@ const ProtectedRoute = ({
       const { data: permissionRows, error: permissionError } = await query;
 
       if (permissionError) {
-        const relationMissing =
-          permissionError.code === "42P01" ||
-          permissionError.message.toLowerCase().includes("dashboard_access");
-
         if (!ignore) {
           setAccess({
             status: "config-error",
-            details: relationMissing
+            details: isMissingRelationError(permissionError, "dashboard_access")
               ? "A tabela public.dashboard_access ainda nao esta disponivel no backend."
               : permissionError.message,
           });
@@ -196,6 +243,32 @@ const ProtectedRoute = ({
       }
 
       if (!permissionRows || permissionRows.length === 0) {
+        const { data: operationsAccess, error: operationsAccessError } =
+          await supabase
+            .from("operations_access")
+            .select("role")
+            .eq("active", true)
+            .maybeSingle();
+
+        if (operationsAccessError) {
+          if (!ignore) {
+            setAccess({
+              status: "config-error",
+              details: isMissingRelationError(operationsAccessError, "operations_access")
+                ? "A tabela public.operations_access ainda nao esta disponivel no backend."
+                : operationsAccessError.message,
+            });
+          }
+          return;
+        }
+
+        if (isOperationsAccessRole(operationsAccess?.role)) {
+          if (!ignore) {
+            setAccess({ status: "redirect", pathname: "/operacional" });
+          }
+          return;
+        }
+
         if (!ignore) {
           setAccess({ status: "denied", userId: requestedUserId, mode: "account" });
         }
@@ -230,17 +303,31 @@ const ProtectedRoute = ({
     };
   }, [accessArea, allowRecognizedUserIdAccess, location.search]);
 
+  useEffect(() => {
+    if (access.status !== "authorized" || !isAdminEmail(access.userEmail)) {
+      return;
+    }
+
+    if (consumeAdminAreaPromptPending()) {
+      setAdminAreaPromptOpen(true);
+    }
+  }, [access]);
+
   const handleLogin = async ({ email, password }: { email: string; password: string }) => {
     setIsSubmitting(true);
     setLoginError(null);
+    const normalizedEmail = email.trim().toLowerCase();
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizedEmail,
       password,
     });
 
     if (error) {
       setLoginError("Email ou senha invalidos.");
+    } else if (isAdminEmail(normalizedEmail)) {
+      markAdminAreaPromptPending();
+      setAdminAreaPromptOpen(true);
     }
 
     setIsSubmitting(false);
@@ -269,6 +356,18 @@ const ProtectedRoute = ({
     return <AccessDenied userId={access.userId} mode={access.mode} />;
   }
 
+  if (access.status === "redirect") {
+    return (
+      <Navigate
+        to={{ pathname: access.pathname, search: access.search }}
+        replace
+      />
+    );
+  }
+
+  const shouldShowAdminAreaPrompt =
+    adminAreaPromptOpen && isAdminEmail(access.userEmail);
+
   return (
     <RouteAccessContext.Provider
       value={{
@@ -284,7 +383,12 @@ const ProtectedRoute = ({
         },
       }}
     >
-      {children}
+      <AdminAreaSelectionDialog
+        open={shouldShowAdminAreaPrompt}
+        onOpenChange={setAdminAreaPromptOpen}
+      />
+      {shouldShowAdminAreaPrompt ? null : <AdminAreaFloatingSwitcher />}
+      {shouldShowAdminAreaPrompt ? null : children}
     </RouteAccessContext.Provider>
   );
 };
