@@ -14,11 +14,15 @@ import {
   Cell,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import { DistribuicaoTabsPanel } from "@/components/dashboard/DistribuicaoTabsPanel";
+import { EmptyChart } from "@/components/dashboard/EmptyChart";
 import { FinancialBridgePanel } from "@/components/dashboard/FinancialBridgePanel";
 import { FunnelStageSheet } from "@/components/dashboard/FunnelStageSheet";
 import { HeroMetricCard } from "@/components/dashboard/HeroMetricCard";
@@ -35,6 +39,7 @@ import { getDateModeLabel } from "@/lib/dateMode";
 import { getEvolucaoBucketLabel } from "@/lib/evolucao";
 import type { FunnelStageDrilldownRecord } from "@/lib/funnelDrilldown";
 import { fmtBRL, fmtDecimal, fmtNum, fmtPct } from "@/lib/fmt";
+import { cn } from "@/lib/utils";
 import {
   Tooltip as UiTooltip,
   TooltipContent,
@@ -111,10 +116,12 @@ function ChartTooltipNum({
   );
 }
 
-function EmptyChart({ label = "Sem dados no período" }: { label?: string }) {
+
+function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="flex h-44 items-center justify-center text-sm text-[#9BAAB8]">
-      {label}
+    <div className="flex items-center gap-3 pt-1">
+      <p className="section-label shrink-0 before:hidden">{title}</p>
+      <div className="flex-1 border-t border-slate-200" aria-hidden="true" />
     </div>
   );
 }
@@ -161,7 +168,9 @@ export default function AbaProcedimentosCirurgicos() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <SectionHeader title="Visão" />
+
+      <div className="animate-stagger grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <HeroMetricCard
           label="Fechados"
           value={fmtNum(d.fechados_qtd)}
@@ -171,6 +180,7 @@ export default function AbaProcedimentosCirurgicos() {
           tone="blue"
           isLoading={d.isLoading}
           comparison={d.comparisons?.kpis.fechados_qtd}
+          trend={d.evolucao?.map((p) => p.value)}
         />
         <HeroMetricCard
           label="Realizados"
@@ -181,6 +191,7 @@ export default function AbaProcedimentosCirurgicos() {
           tone="teal"
           isLoading={d.isLoading}
           comparison={d.comparisons?.kpis.realizados}
+          trend={d.evolucao?.map((p) => p.value)}
         />
         <HeroMetricCard
           label="Faturamento bruto"
@@ -191,6 +202,7 @@ export default function AbaProcedimentosCirurgicos() {
           tone="purple"
           isLoading={d.isLoading}
           comparison={d.comparisons?.kpis.faturamento}
+          trend={d.evolucao?.map((p) => p.value)}
         />
         <HeroMetricCard
           label="Valor líquido"
@@ -203,6 +215,24 @@ export default function AbaProcedimentosCirurgicos() {
           comparison={d.comparisons?.kpis.valor_liquido_total}
         />
       </div>
+
+      <SectionHeader title="Financeiro" />
+
+      <FinancialBridgePanel
+        title="Resultado financeiro"
+        tooltip="Consolida o bruto, os custos diretos e o valor líquido dos procedimentos realizados. A margem mostra quanto do bruto permaneceu como resultado."
+        comparison={d.comparisons?.charts.resultado_financeiro}
+        isLoading={d.isLoading}
+        bruto={fmtBRL(d.faturamento)}
+        custos={fmtBRL(d.custo_total)}
+        liquido={fmtBRL(d.valor_liquido_total)}
+        brutoRaw={d.faturamento}
+        custosRaw={d.custo_total}
+        liquidoRaw={d.valor_liquido_total}
+        margemRatio={margemRatio}
+      />
+
+      <SectionHeader title="Performance" />
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.95fr)]">
         <PerformancePanel
@@ -270,16 +300,7 @@ export default function AbaProcedimentosCirurgicos() {
         />
       </div>
 
-      <FinancialBridgePanel
-        title="Resultado financeiro"
-        tooltip="Consolida o bruto, os custos diretos e o valor líquido dos procedimentos realizados. A margem mostra quanto do bruto permaneceu como resultado."
-        comparison={d.comparisons?.charts.resultado_financeiro}
-        isLoading={d.isLoading}
-        bruto={fmtBRL(d.faturamento)}
-        custos={fmtBRL(d.custo_total)}
-        liquido={fmtBRL(d.valor_liquido_total)}
-        margemRatio={margemRatio}
-      />
+      <SectionHeader title="Funil por Etapa" />
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="panel-shell p-4">
@@ -288,132 +309,193 @@ export default function AbaProcedimentosCirurgicos() {
             tooltip="Mostra quantos cards de procedimentos estão em cada etapa do funil dentro do filtro atual. A ordem segue o CRM para facilitar a leitura operacional."
             comparison={d.comparisons?.charts.funil}
           />
-          {d.isLoading ? (
-            <div className="h-52 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.funil.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={Math.max(220, d.funil.length * 38)}
-            >
-              <BarChart
-                data={d.funil}
-                layout="vertical"
-                margin={{ left: 8, right: 48, top: 4, bottom: 0 }}
+          {(() => {
+            const funnelItems = d.funil.filter((e) => e.value > 0);
+            return d.isLoading ? (
+              <div className="skeleton h-52" />
+            ) : funnelItems.length === 0 ? (
+              <EmptyChart />
+            ) : (
+              <ResponsiveContainer
+                width="100%"
+                height={Math.max(220, funnelItems.length * 38)}
               >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={160}
-                />
-                <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar
-                  dataKey="value"
-                  radius={[0, 4, 4, 0]}
-                  label={{ position: "right", fontSize: 11, fill: "#9BAAB8" }}
+                <BarChart
+                  data={funnelItems}
+                  layout="vertical"
+                  margin={{ left: 8, right: 48, top: 4, bottom: 0 }}
                 >
-                  {d.funil.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill={FUNIL_COLORS[entry.name] ?? "#1A56DB"}
-                      cursor="pointer"
-                      onClick={() => setSelectedStage(entry.name)}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: "#9BAAB8" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 12, fill: "#5C6B7A" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={160}
+                  />
+                  <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
+                  <Bar
+                    dataKey="value"
+                    radius={[0, 4, 4, 0]}
+                    label={{ position: "right", fontSize: 11, fill: "#9BAAB8" }}
+                  >
+                    {funnelItems.map((entry) => (
+                      <Cell
+                        key={entry.name}
+                        fill={FUNIL_COLORS[entry.name] ?? "#1A56DB"}
+                        cursor="pointer"
+                        onClick={() => setSelectedStage(entry.name)}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            );
+          })()}
         </div>
 
+        {/* §8.3 — Composição do custo: donut + list */}
         <div className="panel-shell p-4">
           <PanelTitle
-            title="Custos por categoria"
-            tooltip="Soma os custos lançados nos procedimentos realizados e separa por Hospital, Anestesia, Comissão, Impostos e Instrumentação."
+            title="Composição do custo"
+            tooltip="Mostra como cada categoria de custo (Hospital, Anestesia, Comissão, Impostos, Instrumentação) contribui para o custo total dos procedimentos realizados."
             comparison={d.comparisons?.charts.custos_por_categoria}
           />
           {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
+            <div className="skeleton h-44" />
           ) : d.custos_por_categoria.length === 0 ? (
             <EmptyChart />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={Math.max(200, d.custos_por_categoria.length * 44)}
-            >
-              <BarChart
-                data={d.custos_por_categoria}
-                layout="vertical"
-                margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => fmtBRL(value)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={110}
-                />
-                <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="value" name="Custo total" fill="#B45309" radius={[0, 4, 4, 0]}>
-                  {d.custos_por_categoria.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#B45309"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter((record) => {
-                          if (!record.meta?.realizada) return false;
-                          if (entry.name === "Hospital") return Number(record.meta?.custoHospital ?? 0) > 0;
-                          if (entry.name === "Anestesia") return Number(record.meta?.custoAnestesia ?? 0) > 0;
-                          if (entry.name === "Comissão") return Number(record.meta?.custoComissao ?? 0) > 0;
-                          if (entry.name === "Impostos") return Number(record.meta?.custoImpostos ?? 0) > 0;
-                          if (entry.name === "Instrumentação") return Number(record.meta?.custoInstrumentacao ?? 0) > 0;
-                          return false;
-                        });
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Procedimentos com custo na categoria selecionada",
-                          description:
-                            "Cards realizados que compõem a barra escolhida em Custos por categoria.",
-                          contextLabel: `Categoria: ${entry.name}`,
-                          badgeLabel: "Custos por categoria",
-                          accentColor: "#B45309",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+          ) : (() => {
+            const COST_COLORS = ["#B45309", "#D97706", "#F59E0B", "#92400E", "#78350F"];
+            const total = d.custos_por_categoria.reduce((s, e) => s + e.value, 0);
+            return (
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <div className="flex-shrink-0">
+                  <ResponsiveContainer width={180} height={180}>
+                    <PieChart>
+                      <Pie
+                        data={d.custos_por_categoria}
+                        dataKey="value"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        innerRadius={46}
+                        stroke="none"
+                      >
+                        {d.custos_por_categoria.map((entry, idx) => (
+                          <Cell
+                            key={entry.name}
+                            fill={COST_COLORS[idx % COST_COLORS.length]}
+                            cursor="pointer"
+                            onClick={() => {
+                              const records = currentRecords.filter((record) => {
+                                if (!record.meta?.realizada) return false;
+                                if (entry.name === "Hospital") return Number(record.meta?.custoHospital ?? 0) > 0;
+                                if (entry.name === "Anestesia") return Number(record.meta?.custoAnestesia ?? 0) > 0;
+                                if (entry.name === "Comissão") return Number(record.meta?.custoComissao ?? 0) > 0;
+                                if (entry.name === "Impostos") return Number(record.meta?.custoImpostos ?? 0) > 0;
+                                if (entry.name === "Instrumentação") return Number(record.meta?.custoInstrumentacao ?? 0) > 0;
+                                return false;
+                              });
+                              if (!records.length) return;
+                              setSheetState({
+                                title: "Procedimentos com custo na categoria selecionada",
+                                description: "Cards realizados que compõem a fatia escolhida na composição de custos.",
+                                contextLabel: `Categoria: ${entry.name}`,
+                                badgeLabel: "Composição do custo",
+                                accentColor: COST_COLORS[idx % COST_COLORS.length],
+                                records,
+                              });
+                            }}
+                          />
+                        ))}
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            const item = payload[0].payload as { name: string; value: number };
+                            const pct = total > 0 ? item.value / total : 0;
+                            return (
+                              <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs shadow-card">
+                                <p className="font-medium text-[#0F1923]">{item.name}</p>
+                                <p className="text-[#5C6B7A]">{fmtBRL(item.value)} · {fmtPct(pct)}</p>
+                              </div>
+                            );
+                          }}
+                        />
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex-1 space-y-2">
+                  {/* header */}
+                  <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+                    <span className="min-w-[90px] text-[10px] font-medium uppercase tracking-wide text-[#9BAAB8]">Categoria</span>
+                    <div className="flex-1" />
+                    <span className="w-9 text-right text-[10px] font-medium uppercase tracking-wide text-[#9BAAB8]">%</span>
+                    <span className="min-w-[72px] text-right text-[10px] font-medium uppercase tracking-wide text-[#9BAAB8]">Total</span>
+                    <span className="min-w-[72px] text-right text-[10px] font-medium uppercase tracking-wide text-[#9BAAB8]">Média/proc.</span>
+                  </div>
+                  {d.custos_por_categoria.map((entry, idx) => {
+                    const pct = total > 0 ? entry.value / total : 0;
+                    const color = COST_COLORS[idx % COST_COLORS.length];
+                    const media = d.realizados > 0 ? entry.value / d.realizados : 0;
+                    return (
+                      <div key={entry.name} className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="min-w-[90px] text-xs text-[#5C6B7A]">{entry.name}</span>
+                        <div className="flex-1 overflow-hidden rounded-full bg-slate-100" style={{ height: 6 }}>
+                          <div
+                            className="h-full rounded-full transition-[width] duration-300"
+                            style={{ width: `${pct * 100}%`, backgroundColor: color }}
+                          />
+                        </div>
+                        <span className="w-9 text-right font-mono text-[11px] text-[#5C6B7A]">{fmtPct(pct)}</span>
+                        <span className="min-w-[72px] text-right text-[11px] text-[#0F1923]">{fmtBRL(entry.value)}</span>
+                        <span className="min-w-[72px] text-right font-mono text-[11px] text-[#5C6B7A]">{fmtBRL(media)}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="mt-2 border-t border-slate-100 pt-2 flex items-center justify-between">
+                    <span className="text-[11px] text-[#9BAAB8]">
+                      {d.realizados} proc. realizados
+                    </span>
+                    <span className="text-xs font-semibold text-[#0F1923]">Total: {fmtBRL(total)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
+
+      <SectionHeader title="Análise de Perda" />
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <LossReasonsPanel
           items={d.motivos_perda}
           comparison={d.comparisons?.charts.motivos_perda}
           isLoading={d.isLoading}
+          onBarClick={() => {
+            const records = currentRecords.filter((r) =>
+              r.etapa.toLowerCase().includes("perdido")
+            );
+            if (!records.length) return;
+            setSheetState({
+              title: "Procedimentos perdidos",
+              description: "Cards na etapa Perdido do funil de procedimentos cirúrgicos no período.",
+              contextLabel: "Etapa: Perdido",
+              badgeLabel: "Motivos de perda",
+              accentColor: "#6B7280",
+              records,
+            });
+          }}
         />
         <LossDiagnosticsPanel
           diagnostics={d.perdas_diagnostico}
@@ -425,327 +507,362 @@ export default function AbaProcedimentosCirurgicos() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Faturamento e valor líquido por tipo"
-            tooltip="Compara o valor bruto e o valor líquido dos procedimentos realizados em cada tipo. O valor líquido é calculado descontando os custos lançados do valor bruto."
-            comparison={d.comparisons?.charts.por_tipo}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.por_tipo.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={Math.max(200, d.por_tipo.length * 52)}
-            >
-              <BarChart
-                data={d.por_tipo}
-                layout="vertical"
-                margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => fmtBRL(value)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={110}
-                />
-                <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="fat" name="Faturamento bruto" fill="#1A56DB" radius={[0, 2, 2, 0]}>
-                  {d.por_tipo.map((entry) => (
-                    <Cell
-                      key={`fat-${entry.name}`}
-                      fill="#1A56DB"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.tipo === entry.name && record.meta?.realizada
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Procedimentos do tipo selecionado",
-                          description:
-                            "Cards realizados que compõem a barra escolhida na série Faturamento bruto.",
-                          contextLabel: `Tipo: ${entry.name}`,
-                          badgeLabel: "Faturamento por tipo",
-                          accentColor: "#1A56DB",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-                <Bar dataKey="liq" name="Valor líquido" fill="#0E9F6E" radius={[0, 2, 2, 0]}>
-                  {d.por_tipo.map((entry) => (
-                    <Cell
-                      key={`liq-${entry.name}`}
-                      fill="#0E9F6E"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.tipo === entry.name && record.meta?.realizada
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Resultado líquido do tipo selecionado",
-                          description:
-                            "Cards realizados que compõem a barra escolhida na série Valor líquido.",
-                          contextLabel: `Tipo: ${entry.name}`,
-                          badgeLabel: "Valor líquido por tipo",
-                          accentColor: "#0E9F6E",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+      {/* ── Procedimentos com Prejuízo ── */}
+      {!d.isLoading && (() => {
+        const comPrejuizo = d.tabela.filter((row) => row.valor_liq < 0);
+        if (comPrejuizo.length === 0) return null;
 
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Faturamento por modalidade"
-            tooltip="Soma o valor bruto dos procedimentos realizados em cada modalidade de pagamento. Quando a modalidade não está preenchida, o registro entra como Não definido."
-            comparison={d.comparisons?.charts.por_modalidade}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.por_modalidade.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={Math.max(200, d.por_modalidade.length * 40)}
+        return (
+          <>
+            <SectionHeader title="Alerta Financeiro" />
+            <div className="panel-shell overflow-hidden">
+              <div className="border-b border-border bg-red-50 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-100">
+                    <XCircle className="h-4 w-4 text-red-500" aria-hidden="true" />
+                  </span>
+                  <h3 className="text-sm font-semibold text-red-700">
+                    Procedimentos com resultado negativo
+                    <span className="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600">
+                      {fmtNum(comPrejuizo.length)}
+                    </span>
+                  </h3>
+                </div>
+                <p className="mt-0.5 text-xs text-red-500">
+                  Custos superaram o faturamento bruto — valor líquido negativo.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <caption className="sr-only">Procedimentos com resultado negativo</caption>
+                  <thead>
+                    <tr className="border-b border-border bg-[#F7F9FB]">
+                      {[
+                        ["Paciente", "text-left px-5"],
+                        ["Agendamento", "text-left px-4"],
+                        ["Tipo", "text-left px-4"],
+                        ["Etapa", "text-left px-4"],
+                        ["Bruto", "text-right px-4"],
+                        ["Custo", "text-right px-4"],
+                        ["Líquido", "text-right px-4"],
+                      ].map(([label, cls]) => (
+                        <th
+                          key={label}
+                          className={`py-2.5 text-xs font-medium uppercase tracking-wide text-[#9BAAB8] ${cls}`}
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comPrejuizo.map((row, index) => {
+                      const badge = ETAPA_BADGE[row.etapa] ?? { bg: "#F3F4F6", text: "#374151" };
+                      return (
+                        <tr
+                          key={row.id}
+                          className={cn(
+                            index % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]",
+                            "cursor-pointer hover:bg-red-50/60"
+                          )}
+                          onClick={() => {
+                            const record = currentRecords.find((r) => r.id === row.id);
+                            if (!record) return;
+                            setSheetState({
+                              title: "Procedimento com resultado negativo",
+                              description: "Detalhes do procedimento cujo custo superou o faturamento bruto.",
+                              contextLabel: `Paciente: ${row.nome}`,
+                              badgeLabel: "Prejuízo",
+                              accentColor: "#DC2626",
+                              records: [record],
+                            });
+                          }}
+                        >
+                          <td className="px-5 py-2.5 font-medium text-[#0F1923]">{row.nome}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs text-[#5C6B7A]">{row.data_agendamento}</td>
+                          <td className="px-4 py-2.5 text-[#5C6B7A]">{row.tipo}</td>
+                          <td className="px-4 py-2.5">
+                            <span
+                              className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                              style={{ background: badge.bg, color: badge.text }}
+                            >
+                              {row.etapa}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono text-xs text-[#0F1923]">
+                            {fmtBRL(row.valor_bruto)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono text-xs text-clinic-amber">
+                            {fmtBRL(row.custo)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono text-xs font-semibold text-red-600">
+                            {fmtBRL(row.valor_liq)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
+      <SectionHeader title="Distribuição" />
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="panel-shell p-4">
+        <PanelTitle
+          title="Faturamento e valor líquido por tipo"
+          tooltip="Compara o valor bruto e o valor líquido dos procedimentos realizados em cada tipo. O valor líquido é calculado descontando os custos lançados do valor bruto."
+          comparison={d.comparisons?.charts.por_tipo}
+        />
+        {d.isLoading ? (
+          <div className="skeleton h-44" />
+        ) : d.por_tipo.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <ResponsiveContainer
+            width="100%"
+            height={Math.max(200, d.por_tipo.length * 52)}
+          >
+            <BarChart
+              data={d.por_tipo}
+              layout="vertical"
+              margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
             >
-              <BarChart
-                data={d.por_modalidade}
-                layout="vertical"
-                margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => fmtBRL(value)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={110}
-                />
-                <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="value" name="Faturamento" fill="#0891B2" radius={[0, 4, 4, 0]}>
-                  {d.por_modalidade.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#0891B2"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.modalidade === entry.name &&
-                            record.meta?.realizada
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Faturamento da modalidade selecionada",
-                          description:
-                            "Procedimentos realizados que compõem a barra escolhida em Faturamento por modalidade.",
-                          contextLabel: `Modalidade: ${entry.name}`,
-                          badgeLabel: "Faturamento por modalidade",
-                          accentColor: "#0891B2",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+              <XAxis
+                type="number"
+                tick={{ fontSize: 11, fill: "#9BAAB8" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => fmtBRL(value)}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fontSize: 12, fill: "#5C6B7A" }}
+                axisLine={false}
+                tickLine={false}
+                width={110}
+              />
+              <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
+              <Bar dataKey="fat" name="Faturamento bruto" fill="#1A56DB" radius={[0, 2, 2, 0]}>
+                {d.por_tipo.map((entry) => (
+                  <Cell
+                    key={`fat-${entry.name}`}
+                    fill="#1A56DB"
+                    cursor="pointer"
+                    onClick={() => {
+                      const records = currentRecords.filter(
+                        (record) =>
+                          record.meta?.tipo === entry.name && record.meta?.realizada
+                      );
+                      if (!records.length) return;
+                      setSheetState({
+                        title: "Procedimentos do tipo selecionado",
+                        description:
+                          "Cards realizados que compõem a barra escolhida na série Faturamento bruto.",
+                        contextLabel: `Tipo: ${entry.name}`,
+                        badgeLabel: "Faturamento por tipo",
+                        accentColor: "#1A56DB",
+                        records,
+                      });
+                    }}
+                  />
+                ))}
+              </Bar>
+              <Bar dataKey="liq" name="Valor líquido" fill="#0E9F6E" radius={[0, 2, 2, 0]}>
+                {d.por_tipo.map((entry) => (
+                  <Cell
+                    key={`liq-${entry.name}`}
+                    fill="#0E9F6E"
+                    cursor="pointer"
+                    onClick={() => {
+                      const records = currentRecords.filter(
+                        (record) =>
+                          record.meta?.tipo === entry.name && record.meta?.realizada
+                      );
+                      if (!records.length) return;
+                      setSheetState({
+                        title: "Resultado líquido do tipo selecionado",
+                        description:
+                          "Cards realizados que compõem a barra escolhida na série Valor líquido.",
+                        contextLabel: `Tipo: ${entry.name}`,
+                        badgeLabel: "Valor líquido por tipo",
+                        accentColor: "#0E9F6E",
+                        records,
+                      });
+                    }}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Procedimentos por origem"
-            tooltip="Conta quantos procedimentos fechados estão ligados a cada origem de contato. A origem é classificada a partir das tags e da origem do contato, não do texto bruto do card."
-            comparison={d.comparisons?.charts.por_origem}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.por_origem.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={Math.max(200, d.por_origem.length * 40)}
-            >
-              <BarChart
-                data={d.por_origem}
-                layout="vertical"
-                margin={{ left: 8, right: 28, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={90}
-                />
-                <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="value" fill="#7C3AED" radius={[0, 4, 4, 0]}>
-                  {d.por_origem.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#7C3AED"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.origem === entry.name &&
-                            record.meta?.fechadaBase
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Procedimentos da origem selecionada",
-                          description:
-                            "Cards que compõem a barra escolhida em Procedimentos por origem.",
-                          contextLabel: `Origem: ${entry.name}`,
-                          badgeLabel: "Procedimentos por origem",
-                          accentColor: "#7C3AED",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+      <DistribuicaoTabsPanel
+        isLoading={d.isLoading}
+        title="Faturamento por modalidade"
+        tooltip="Faturamento bruto dos procedimentos realizados agrupado por modalidade."
+        tabs={[
+          {
+            key: "modalidade",
+            label: "Modalidade",
+            data: d.por_modalidade.map((e) => ({ name: e.name, value: e.fat })),
+            tooltipType: "brl",
+            color: "#1A56DB",
+            yAxisWidth: 110,
+            onBarClick: (name) => {
+              const records = currentRecords.filter(
+                (record) =>
+                  record.meta?.modalidade === name && record.meta?.realizada
+              );
+              if (!records.length) return;
+              setSheetState({
+                title: "Faturamento da modalidade selecionada",
+                description:
+                  "Procedimentos realizados que compõem a barra escolhida em Faturamento por modalidade.",
+                contextLabel: `Modalidade: ${name}`,
+                badgeLabel: "Faturamento por modalidade",
+                accentColor: "#1A56DB",
+                records,
+              });
+            },
+          },
+        ]}
+      />
 
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Ticket médio por responsável"
-            tooltip="Faturamento médio por paciente para cada responsável, considerando apenas procedimentos realizados."
-            comparison={d.comparisons?.charts.ticket_por_responsavel}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.ticket_por_responsavel.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={Math.max(200, d.ticket_por_responsavel.length * 44)}
+      <DistribuicaoTabsPanel
+        isLoading={d.isLoading}
+        title="Procedimentos por origem"
+        tooltip="Quantidade de procedimentos agendados agrupados por origem de captação do paciente."
+        tabs={[
+          {
+            key: "origem",
+            label: "Origem",
+            data: d.por_origem,
+            tooltipType: "count",
+            unit: "procedimentos",
+            color: "#7C3AED",
+            yAxisWidth: 120,
+            onBarClick: (name) => {
+              const records = currentRecords.filter(
+                (record) =>
+                  record.meta?.origem === name && record.meta?.agendadaBase
+              );
+              if (!records.length) return;
+              setSheetState({
+                title: "Procedimentos da origem selecionada",
+                description:
+                  "Cards que compõem a barra escolhida em Procedimentos por origem.",
+                contextLabel: `Origem: ${name}`,
+                badgeLabel: "Procedimentos por origem",
+                accentColor: "#7C3AED",
+                records,
+              });
+            },
+          },
+        ]}
+      />
+
+      <div className="panel-shell p-4">
+        <PanelTitle
+          title="Ticket médio por responsável"
+          tooltip="Faturamento médio por paciente para cada responsável, considerando apenas procedimentos realizados."
+          comparison={d.comparisons?.charts.ticket_por_responsavel}
+        />
+        {d.isLoading ? (
+          <div className="skeleton h-44" />
+        ) : d.ticket_por_responsavel.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <ResponsiveContainer
+            width="100%"
+            height={Math.max(200, d.ticket_por_responsavel.length * 44)}
+          >
+            <BarChart
+              data={d.ticket_por_responsavel}
+              layout="vertical"
+              margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
             >
-              <BarChart
-                data={d.ticket_por_responsavel}
-                layout="vertical"
-                margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => fmtBRL(value)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={120}
-                />
-                <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="ticket" name="Ticket médio" fill="#1A56DB" radius={[0, 4, 4, 0]}>
-                  {d.ticket_por_responsavel.map((entry) => (
-                    <Cell
-                      key={`ticket-${entry.name}`}
-                      fill="#1A56DB"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.responsavel === entry.name &&
-                            record.meta?.realizada
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Procedimentos do responsável selecionado",
-                          description:
-                            "Cards realizados que compõem a barra escolhida na série Ticket médio por responsável.",
-                          contextLabel: `Responsável: ${entry.name}`,
-                          badgeLabel: "Ticket médio por responsável",
-                          accentColor: "#1A56DB",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-                <Bar dataKey="fat" name="Faturamento" fill="#0E9F6E" radius={[0, 4, 4, 0]}>
-                  {d.ticket_por_responsavel.map((entry) => (
-                    <Cell
-                      key={`fat-${entry.name}`}
-                      fill="#0E9F6E"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.responsavel === entry.name &&
-                            record.meta?.realizada
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Faturamento do responsável selecionado",
-                          description:
-                            "Cards realizados que compõem a barra escolhida na série Faturamento por responsável.",
-                          contextLabel: `Responsável: ${entry.name}`,
-                          badgeLabel: "Faturamento por responsável",
-                          accentColor: "#0E9F6E",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+              <XAxis
+                type="number"
+                tick={{ fontSize: 11, fill: "#9BAAB8" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => fmtBRL(value)}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fontSize: 12, fill: "#5C6B7A" }}
+                axisLine={false}
+                tickLine={false}
+                width={120}
+              />
+              <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
+              <Bar dataKey="ticket" name="Ticket médio" fill="#1A56DB" radius={[0, 4, 4, 0]}>
+                {d.ticket_por_responsavel.map((entry) => (
+                  <Cell
+                    key={`ticket-${entry.name}`}
+                    fill="#1A56DB"
+                    cursor="pointer"
+                    onClick={() => {
+                      const records = currentRecords.filter(
+                        (record) =>
+                          record.responsavel === entry.name &&
+                          record.meta?.realizada
+                      );
+                      if (!records.length) return;
+                      setSheetState({
+                        title: "Procedimentos do responsável selecionado",
+                        description:
+                          "Cards realizados que compõem a barra escolhida na série Ticket médio por responsável.",
+                        contextLabel: `Responsável: ${entry.name}`,
+                        badgeLabel: "Ticket médio por responsável",
+                        accentColor: "#1A56DB",
+                        records,
+                      });
+                    }}
+                  />
+                ))}
+              </Bar>
+              <Bar dataKey="fat" name="Faturamento" fill="#0E9F6E" radius={[0, 4, 4, 0]}>
+                {d.ticket_por_responsavel.map((entry) => (
+                  <Cell
+                    key={`fat-${entry.name}`}
+                    fill="#0E9F6E"
+                    cursor="pointer"
+                    onClick={() => {
+                      const records = currentRecords.filter(
+                        (record) =>
+                          record.responsavel === entry.name &&
+                          record.meta?.realizada
+                      );
+                      if (!records.length) return;
+                      setSheetState({
+                        title: "Faturamento do responsável selecionado",
+                        description:
+                          "Cards realizados que compõem a barra escolhida na série Faturamento por responsável.",
+                        contextLabel: `Responsável: ${entry.name}`,
+                        badgeLabel: "Faturamento por responsável",
+                        accentColor: "#0E9F6E",
+                        records,
+                      });
+                    }}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
+      </div>{/* /grid distribuição */}
+
+            <SectionHeader title="Evolução" />
 
       <div className="panel-shell p-4">
         <PanelTitle
@@ -754,7 +871,7 @@ export default function AbaProcedimentosCirurgicos() {
           comparison={d.comparisons?.charts.evolucao}
         />
         {d.isLoading ? (
-          <div className="h-48 animate-pulse rounded-lg bg-[#F0F3F6]" />
+          <div className="skeleton h-48" />
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart
@@ -843,6 +960,8 @@ export default function AbaProcedimentosCirurgicos() {
           </ResponsiveContainer>
         )}
       </div>
+
+      {!d.isLoading && d.tabela.length > 0 && <SectionHeader title="Registros" />}
 
       {!d.isLoading && d.tabela.length > 0 && (
         <div className="panel-shell overflow-hidden">

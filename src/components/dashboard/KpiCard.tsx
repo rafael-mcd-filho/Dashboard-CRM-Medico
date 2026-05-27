@@ -9,14 +9,14 @@ import {
 } from "@/components/ui/tooltip";
 
 const valueColorMap = {
-  default: "text-[#0F1923]",
+  default: "text-slate-900",
   success: "text-clinic-green",
-  danger: "text-clinic-red",
+  danger:  "text-clinic-red",
   warning: "text-clinic-amber",
-  teal: "text-clinic-teal",
-  purple: "text-clinic-purple",
-  blue: "text-clinic-blue",
-};
+  teal:    "text-clinic-teal",
+  purple:  "text-clinic-purple",
+  blue:    "text-clinic-blue",
+} as const;
 
 interface KpiCardProps {
   label: string;
@@ -27,6 +27,7 @@ interface KpiCardProps {
   valueColor?: keyof typeof valueColorMap;
   size?: "default" | "lg";
   comparison?: MetricComparison;
+  inverseSentiment?: boolean;
 }
 
 export function KpiCard({
@@ -38,9 +39,10 @@ export function KpiCard({
   valueColor = "default",
   size = "default",
   comparison,
+  inverseSentiment,
 }: KpiCardProps) {
   return (
-    <div className="panel-shell flex min-w-0 flex-col gap-2 p-4 transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-card-hover">
+    <div className="panel-shell panel-shell-hover flex min-w-0 flex-col gap-2 p-4">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <span className="section-label min-w-0 flex-1 leading-tight [overflow-wrap:anywhere]">
           {label}
@@ -49,23 +51,20 @@ export function KpiCard({
           <TooltipTrigger asChild>
             <button
               type="button"
-              aria-label="Mais informações"
-              className="mt-0.5 shrink-0 text-[#C8D2DC] hover:text-[#9BAAB8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clinic-blue focus-visible:ring-offset-1 rounded"
+              aria-label={`Mais informações sobre ${label}`}
+              className="mt-0.5 shrink-0 text-slate-300 transition-colors hover:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clinic-blue focus-visible:ring-offset-1 rounded"
             >
               <Info className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </TooltipTrigger>
-          <TooltipContent
-            className="text-xs leading-relaxed"
-            side="top"
-          >
+          <TooltipContent className="max-w-xs text-xs leading-relaxed" side="top">
             {tooltip}
           </TooltipContent>
         </Tooltip>
       </div>
 
       {isLoading ? (
-        <div className="h-8 w-24 animate-pulse rounded-md bg-[#F0F3F6]" />
+        <div className="skeleton h-8 w-24" />
       ) : (
         <span
           className={cn(
@@ -78,10 +77,12 @@ export function KpiCard({
         </span>
       )}
 
-      {!isLoading && comparison ? <ComparisonBadge comparison={comparison} /> : null}
+      {!isLoading && comparison ? (
+        <ComparisonBadge comparison={comparison} inverseSentiment={inverseSentiment} />
+      ) : null}
 
       {sub && !isLoading && (
-        <span className="text-xs text-[#9BAAB8]">{sub}</span>
+        <span className="text-xs text-slate-400">{sub}</span>
       )}
     </div>
   );

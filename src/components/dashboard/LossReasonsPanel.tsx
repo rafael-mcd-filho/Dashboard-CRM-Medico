@@ -11,6 +11,8 @@ type LossReasonsPanelProps = {
   comparison?: MetricComparison;
   isLoading?: boolean;
   emptyLabel?: string;
+  /** Chamado ao clicar em uma barra para drill-down */
+  onBarClick?: (name: string) => void;
 };
 
 function LossReasonTooltip({
@@ -43,13 +45,16 @@ export function LossReasonsPanel({
   comparison,
   isLoading,
   emptyLabel = "Sem perdas no período",
+  onBarClick,
 }: LossReasonsPanelProps) {
+  const hasClick = Boolean(onBarClick);
+
   return (
     <div className="panel-shell p-4">
       <PanelTitle title={title} tooltip={tooltip} comparison={comparison} />
 
       {isLoading ? (
-        <div className="h-56 animate-pulse rounded-lg bg-[#F0F3F6]" />
+        <div className="skeleton h-56" />
       ) : items.length === 0 ? (
         <div className="flex h-44 items-center justify-center text-center text-sm text-[#9BAAB8]">
           {emptyLabel}
@@ -86,6 +91,10 @@ export function LossReasonsPanel({
               name="Perdas"
               radius={[0, 4, 4, 0]}
               label={{ position: "right", fontSize: 11, fill: "#9BAAB8" }}
+              cursor={hasClick ? "pointer" : undefined}
+              onClick={hasClick ? (data: { name?: string }) => {
+                if (data?.name) onBarClick?.(data.name);
+              } : undefined}
             >
               {items.map((entry) => (
                 <Cell key={entry.name} fill={entry.color} />

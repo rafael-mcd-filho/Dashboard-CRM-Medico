@@ -1,34 +1,35 @@
 import { PanelTitle } from "@/components/dashboard/PanelTitle";
+import { cn } from "@/lib/utils";
 import type { MetricComparison } from "@/lib/comparison";
 
 const toneMap = {
   default: {
-    value: "text-[#0F1923]",
-    chip: "bg-[#F3F5F7] text-[#5C6B7A]",
+    value: "text-slate-900",
+    chip:  "bg-slate-100 text-slate-500",
   },
   success: {
     value: "text-clinic-green",
-    chip: "bg-[#E8F8F1] text-clinic-green",
+    chip:  "bg-[#ECFDF5] text-clinic-green",
   },
   danger: {
     value: "text-clinic-red",
-    chip: "bg-[#FEECEC] text-clinic-red",
+    chip:  "bg-[#FEF2F2] text-clinic-red",
   },
   warning: {
     value: "text-clinic-amber",
-    chip: "bg-[#FFF4E8] text-clinic-amber",
+    chip:  "bg-[#FFF7ED] text-clinic-amber",
   },
   teal: {
     value: "text-clinic-teal",
-    chip: "bg-[#EAF8FC] text-clinic-teal",
+    chip:  "bg-[#EAF8FC] text-clinic-teal",
   },
   purple: {
     value: "text-clinic-purple",
-    chip: "bg-[#F3EDFF] text-clinic-purple",
+    chip:  "bg-[#F3EDFF] text-clinic-purple",
   },
   blue: {
     value: "text-clinic-blue",
-    chip: "bg-[#EEF4FF] text-clinic-blue",
+    chip:  "bg-[#EEF4FF] text-clinic-blue",
   },
 } as const;
 
@@ -61,53 +62,52 @@ export function PerformancePanel({
   headlineValue,
   headlineDescription,
   progressValue,
-  progressColor = "#1A56DB",
+  progressColor = "#2563EB",
   stats,
 }: PerformancePanelProps) {
   return (
     <div className="panel-shell p-4">
-      <PanelTitle
-        title={title}
-        tooltip={tooltip}
-        comparison={comparison}
-      />
+      <PanelTitle title={title} tooltip={tooltip} comparison={comparison} />
 
       {isLoading ? (
         <div className="space-y-3">
-          <div className="h-24 animate-pulse rounded-[20px] bg-[#F0F3F6]" />
+          {/* Skeleton headline */}
+          <div className="skeleton h-24 w-full" />
+          {/* Skeleton stat-cards */}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: Math.max(stats.length, 4) }).map((_, index) => (
-              <div
-                key={index}
-                className="h-20 animate-pulse rounded-[18px] bg-[#F0F3F6]"
-              />
+            {Array.from({ length: Math.max(stats.length, 4) }).map((_, i) => (
+              <div key={i} className="skeleton h-20 w-full" />
             ))}
           </div>
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="rounded-[20px] border border-[#E2E6EB] bg-[linear-gradient(135deg,#FFFFFF_0%,#F7FAFF_100%)] p-4 shadow-[0_10px_28px_rgba(15,25,35,0.05)]">
+          {/* Headline card */}
+          <div className="rounded-[var(--radius-md)] border border-slate-100 bg-gradient-to-br from-white to-slate-50/80 p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9BAAB8]">
-                  {headlineLabel}
-                </p>
+                <p className="section-label">{headlineLabel}</p>
+                {/* kpi-md: 22px mono — nível headline do painel */}
                 <div
-                  className="mt-2.5 font-mono text-[2.15rem] font-bold leading-none tracking-[-0.07em]"
+                  className="mt-2.5 font-mono text-[1.875rem] font-bold leading-none tracking-[-0.04em] font-variant-numeric tabular-nums"
                   style={{ color: progressColor }}
                 >
                   {headlineValue}
                 </div>
               </div>
-
-              <p className="max-w-[38ch] text-[13px] leading-5 text-[#5C6B7A]">
+              <p className="max-w-[38ch] text-[13px] leading-5 text-slate-500">
                 {headlineDescription}
               </p>
             </div>
 
-            <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[#E8EDF3]">
+            {/* Progress bar — h-2 mais fino, premium */}
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full transition-[width] duration-300"
+                className="h-full rounded-full transition-[width] duration-500"
+                role="progressbar"
+                aria-valuenow={Math.round(progressValue * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
                 style={{
                   width: `${Math.max(0, Math.min(100, progressValue * 100))}%`,
                   backgroundColor: progressColor,
@@ -116,23 +116,33 @@ export function PerformancePanel({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {/* Stat-cards */}
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {stats.map((stat) => {
               const tone = toneMap[stat.tone ?? "default"];
 
               return (
                 <div
                   key={stat.label}
-                  className="rounded-[18px] border border-[#E2E6EB] bg-white p-3 shadow-[0_8px_24px_rgba(15,25,35,0.04)]"
+                  className="rounded-[var(--radius-md)] border border-slate-100 bg-white p-3"
                 >
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9BAAB8]">
-                    {stat.label}
-                  </span>
-                  <div className={`mt-2.5 font-mono text-[1.65rem] font-bold leading-none tracking-[-0.05em] ${tone.value}`}>
+                  <span className="section-label">{stat.label}</span>
+                  {/* kpi-sm: 18px mono — nível stat-card */}
+                  <div
+                    className={cn(
+                      "mt-2 font-mono text-[1.125rem] font-bold leading-none tracking-[-0.02em] font-variant-numeric tabular-nums",
+                      tone.value
+                    )}
+                  >
                     {stat.value}
                   </div>
                   {stat.sub ? (
-                    <span className={`mt-2.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${tone.chip}`}>
+                    <span
+                      className={cn(
+                        "mt-2 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                        tone.chip
+                      )}
+                    >
                       {stat.sub}
                     </span>
                   ) : null}

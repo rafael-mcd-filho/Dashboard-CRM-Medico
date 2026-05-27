@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, Users, XCircle } from "lucide-react";
+import { ArrowUpDown, Clock3, RefreshCw, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Bar,
   BarChart,
@@ -12,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { EmptyChart } from "@/components/dashboard/EmptyChart";
 import { HeroMetricCard } from "@/components/dashboard/HeroMetricCard";
 import { PanelTitle } from "@/components/dashboard/PanelTitle";
 import { RecordsDrilldownSheet } from "@/components/dashboard/RecordsDrilldownSheet";
@@ -40,72 +42,7 @@ function ChartTooltip({
   );
 }
 
-function EmptyChart({ label }: { label: string }) {
-  return (
-    <div className="flex h-48 items-center justify-center text-sm text-[#9BAAB8]">
-      {label}
-    </div>
-  );
-}
 
-function MultiFunnelPanel({
-  isLoading,
-  contatosMultiFunil,
-  taxaRetencao,
-  comparison,
-}: {
-  isLoading: boolean;
-  contatosMultiFunil: number;
-  taxaRetencao: number;
-  comparison?: Parameters<typeof PanelTitle>[0]["comparison"];
-}) {
-  return (
-    <div className="panel-shell p-4">
-      <PanelTitle
-        title="Participação multi-funil"
-        tooltip="Mostra quantos contatos apareceram em pelo menos dois funis no mesmo período e qual fatia isso representa dentro da base nova de leads."
-        comparison={comparison}
-        extra={
-          <span className="rounded-full bg-[#EEF4FF] px-2 py-0.5 text-[10px] font-medium text-clinic-blue">
-            Multi-funil: {fmtNum(contatosMultiFunil)}
-          </span>
-        }
-      />
-
-      {isLoading ? (
-        <div className="h-36 animate-pulse rounded-[20px] bg-[#F0F3F6]" />
-      ) : (
-        <div className="rounded-[20px] border border-[#D8EEF5] bg-[linear-gradient(135deg,#FFFFFF_0%,#F2FBFF_100%)] p-4 shadow-[0_10px_28px_rgba(15,25,35,0.05)]">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9BAAB8]">
-                Retenção multi-funil
-              </p>
-              <div className="mt-2.5 font-mono text-[2.15rem] font-bold leading-none tracking-[-0.07em] text-clinic-teal">
-                {fmtPct(taxaRetencao)}
-              </div>
-            </div>
-
-            <p className="max-w-[38ch] text-[13px] leading-5 text-[#5C6B7A]">
-              Mede quanto da base nova de leads do período reaparece em dois ou
-              mais funis, indicando profundidade de relacionamento.
-            </p>
-          </div>
-
-          <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[#DDEFF5]">
-            <div
-              className="h-full rounded-full transition-[width] duration-300"
-              style={{
-                width: `${Math.max(0, Math.min(100, taxaRetencao * 100))}%`,
-                backgroundColor: "#0891B2",
-              }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function AbaContatos() {
   const {
@@ -124,6 +61,7 @@ export default function AbaContatos() {
     leads_novos,
     contatos_multi_funil,
     taxa_retencao,
+    tempo_medio_segundo_funil,
     leads_por_origem,
     leads_por_tag,
     evolucao_leads,
@@ -131,6 +69,17 @@ export default function AbaContatos() {
     comparisons,
     registros,
   } = useContatosData();
+
+  /* §6.3 — sortable multi-funil table */
+  const [tableSort, setTableSort] = useState<"nome" | "primeira_entrada">("primeira_entrada");
+  const sortedMultiFunilTable = useMemo(
+    () =>
+      [...multiFilnTable].sort((a, b) => {
+        if (tableSort === "nome") return a.nome.localeCompare(b.nome);
+        return (b.primeira_entrada ?? "").localeCompare(a.primeira_entrada ?? "");
+      }),
+    [multiFilnTable, tableSort]
+  );
 
   const registrosOrdenados = useMemo(
     () => (registros ?? []).slice().sort((a, b) => a.nome.localeCompare(b.nome)),
@@ -157,7 +106,8 @@ export default function AbaContatos() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]">
+      {/* §6.1 — 4 KPIs em vez de 1 + painel */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <HeroMetricCard
           label="Leads novos"
           value={fmtNum(leads_novos)}
@@ -167,13 +117,42 @@ export default function AbaContatos() {
           tone="blue"
           isLoading={isLoading}
           comparison={comparisons?.kpis.leads_novos}
+          trend={evolucao_leads?.map((p) => p.value)}
         />
-
-        <MultiFunnelPanel
+        <HeroMetricCard
+          label="Contatos multi-funil"
+          value={fmtNum(contatos_multi_funil)}
+          description="Contatos que aparecem em pelo menos dois funis no período."
+          tooltip="Conta quantos leads do período selecionado possuem cards em dois ou mais funis (Consultas, Espirometria, Broncoscopia ou Proc. Cirúrgicos)."
+          icon={RefreshCw}
+          tone="teal"
           isLoading={isLoading}
-          contatosMultiFunil={contatos_multi_funil}
-          taxaRetencao={taxa_retencao}
+          comparison={comparisons?.kpis.contatos_multi_funil}
+        />
+        <HeroMetricCard
+          label="Taxa de retenção"
+          value={fmtPct(taxa_retencao)}
+          description="Percentual de leads que reaparece em dois ou mais funis."
+          tooltip="Mede quanto da base nova de leads do período reaparece em dois ou mais funis, indicando profundidade de relacionamento."
+          icon={Users}
+          tone="purple"
+          isLoading={isLoading}
           comparison={comparisons?.kpis.taxa_retencao}
+        />
+        <HeroMetricCard
+          label="Tempo médio até 2º funil"
+          value={
+            tempo_medio_segundo_funil > 0
+              ? `${Math.round(tempo_medio_segundo_funil)} dias`
+              : "—"
+          }
+          description="Média de dias entre o 1º e o 2º card em funis distintos."
+          tooltip="Para cada contato multi-funil, calcula a diferença em dias entre a criação do card mais antigo e o segundo mais antigo em funis diferentes. Mostra a média desses valores."
+          icon={Clock3}
+          tone="amber"
+          isLoading={isLoading}
+          comparison={comparisons?.kpis.tempo_medio_segundo_funil}
+          inverseSentiment
         />
       </div>
 
@@ -183,7 +162,7 @@ export default function AbaContatos() {
           comparison={comparisons?.charts.evolucao_leads}
         />
         {isLoading ? (
-          <div className="h-48 animate-pulse rounded-lg bg-[#F0F3F6]" />
+          <div className="skeleton h-48" />
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart
@@ -258,7 +237,7 @@ export default function AbaContatos() {
             comparison={comparisons?.charts.leads_por_origem}
           />
           {isLoading ? (
-            <div className="h-48 animate-pulse rounded-lg bg-[#F0F3F6]" />
+            <div className="skeleton h-48" />
           ) : leads_por_origem.length === 0 ? (
             <EmptyChart label="Sem dados no período" />
           ) : (
@@ -324,7 +303,7 @@ export default function AbaContatos() {
             comparison={comparisons?.charts.leads_por_tag}
           />
           {isLoading ? (
-            <div className="h-48 animate-pulse rounded-lg bg-[#F0F3F6]" />
+            <div className="skeleton h-48" />
           ) : leads_por_tag.length === 0 ? (
             <EmptyChart label="Sem tags no período" />
           ) : (
@@ -387,6 +366,7 @@ export default function AbaContatos() {
         </div>
       </div>
 
+      {/* §6.3 — multi-funil table with avatars, "Primeira entrada", sortable */}
       {!isLoading && multiFilnTable.length > 0 && (
         <div className="panel-shell overflow-hidden">
           <div className="border-b border-border px-4 py-3">
@@ -405,18 +385,34 @@ export default function AbaContatos() {
               <caption className="sr-only">Pacientes multi-funil</caption>
               <thead>
                 <tr className="border-b border-border bg-[#F7F9FB]">
-                  <th className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-[#9BAAB8]">
-                    Paciente
+                  <th className="px-5 py-2.5 text-left">
+                    <button
+                      type="button"
+                      onClick={() => setTableSort("nome")}
+                      className={cn(
+                        "flex items-center gap-1 text-xs font-medium uppercase tracking-wide transition-colors",
+                        tableSort === "nome" ? "text-clinic-blue" : "text-[#9BAAB8] hover:text-[#5C6B7A]"
+                      )}
+                    >
+                      Paciente <ArrowUpDown className="h-3 w-3" />
+                    </button>
                   </th>
-                  {[
-                    "Consultas",
-                    "Broncoscopia",
-                    "Espirometria",
-                    "Proc. Cirúrgicos",
-                  ].map((col) => (
+                  <th className="px-4 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setTableSort("primeira_entrada")}
+                      className={cn(
+                        "flex items-center gap-1 text-xs font-medium uppercase tracking-wide transition-colors",
+                        tableSort === "primeira_entrada" ? "text-clinic-blue" : "text-[#9BAAB8] hover:text-[#5C6B7A]"
+                      )}
+                    >
+                      Entrada <ArrowUpDown className="h-3 w-3" />
+                    </button>
+                  </th>
+                  {(["Consultas", "Bronco.", "Espiro.", "Cirurgia"] as const).map((col) => (
                     <th
                       key={col}
-                      className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wide text-[#9BAAB8]"
+                      className="px-3 py-2.5 text-center text-xs font-medium uppercase tracking-wide text-[#9BAAB8]"
                     >
                       {col}
                     </th>
@@ -424,32 +420,53 @@ export default function AbaContatos() {
                 </tr>
               </thead>
               <tbody>
-                {multiFilnTable.map((row, index) => (
-                  <tr
-                    key={row.contato_id}
-                    className={index % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"}
-                  >
-                    <td className="px-5 py-2.5 font-medium text-[#0F1923]">
-                      {row.nome}
-                    </td>
-                    {(
-                      [
-                        row.consultas,
-                        row.broncoscopia,
-                        row.espirometria,
-                        row.procedimentos,
-                      ] as boolean[]
-                    ).map((has, idx) => (
-                      <td key={idx} className="px-4 py-2.5 text-center">
-                        {has ? (
-                          <CheckCircle2 className="inline h-4 w-4 text-clinic-green" />
-                        ) : (
-                          <XCircle className="inline h-4 w-4 text-[#DDE3EA]" />
-                        )}
+                {sortedMultiFunilTable.map((row, index) => {
+                  const initials = row.nome
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((w: string) => w[0].toUpperCase())
+                    .join("");
+                  const funnelCols: {key: string; color: string; bg: string; active: boolean}[] = [
+                    { key: "consultas",    color: "#1A56DB", bg: "#EEF4FF", active: row.consultas },
+                    { key: "broncoscopia", color: "#059669", bg: "#ECFDF5", active: row.broncoscopia },
+                    { key: "espirometria", color: "#0891B2", bg: "#E0F9FF", active: row.espirometria },
+                    { key: "procedimentos", color: "#7C3AED", bg: "#F3EEFF", active: row.procedimentos },
+                  ];
+                  return (
+                    <tr
+                      key={row.contato_id}
+                      className={index % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"}
+                    >
+                      <td className="px-5 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[10px] font-semibold text-clinic-blue">
+                            {initials || "?"}
+                          </span>
+                          <span className="font-medium text-[#0F1923]">{row.nome}</span>
+                        </div>
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      <td className="px-4 py-2.5 font-mono text-xs text-[#5C6B7A]">
+                        {row.primeira_entrada
+                          ? row.primeira_entrada.slice(0, 10).split("-").reverse().join("/")
+                          : "—"}
+                      </td>
+                      {funnelCols.map((col) => (
+                        <td key={col.key} className="px-3 py-2.5 text-center">
+                          {col.active ? (
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: col.color }}
+                              title="Possui card neste funil"
+                            />
+                          ) : (
+                            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#E2E8F0]" />
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

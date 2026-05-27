@@ -1,5 +1,7 @@
-import { Ban, ShieldX, TriangleAlert } from "lucide-react";
+import { useState } from "react";
+import { Ban, ChevronDown, Mail, ShieldX } from "lucide-react";
 import AccessShell from "@/components/auth/AccessShell";
+import { cn } from "@/lib/utils";
 
 type AccessDeniedProps = {
   userId: string | null;
@@ -7,94 +9,97 @@ type AccessDeniedProps = {
 };
 
 const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
+  const [techOpen, setTechOpen] = useState(false);
   const isOperationsDenied = mode === "operations";
-  const receivedCredential = isOperationsDenied
-    ? userId
-      ? `email=${userId}`
-      : "email ausente"
-    : userId
-      ? `userid=${userId}`
-      : "userid ausente";
-  const isAccountDenied = mode === "account";
+  const isAccountDenied    = mode === "account";
 
+  const receivedCredential = isOperationsDenied
+    ? userId ? `email=${userId}` : "email ausente"
+    : userId ? `userid=${userId}` : "userid ausente";
+
+  /* mailto pré-formatado para solicitar acesso */
+  const mailtoSubject = encodeURIComponent("Solicitação de acesso — Dashboard CRM Médico");
+  const mailtoBody    = encodeURIComponent(
+    `Olá,\n\nSolicito liberação de acesso.\n\nCredencial: ${receivedCredential}\nÁrea: ${mode}\n\nAguardo retorno.`
+  );
+  const mailtoHref = `mailto:?subject=${mailtoSubject}&body=${mailtoBody}`;
+
+  /* Cópia simplificada do userid denied — layout mais compacto */
   if (!isAccountDenied && !isOperationsDenied) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-[#F3F7FB] text-[#0F1923]">
-        <div className="absolute left-[-8rem] top-[-6rem] h-[26rem] w-[26rem] rounded-full bg-[rgba(185,28,28,0.14)] blur-3xl" />
-        <div className="absolute bottom-[-10rem] right-[-8rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(245,158,11,0.12)] blur-3xl" />
-        <div className="bg-dashboard-grid absolute inset-0 opacity-40" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(243,247,251,0.18),rgba(243,247,251,0.92))]" />
+      <div className="relative flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="bg-dashboard-grid absolute inset-0 opacity-25" />
+        <div className="relative w-full max-w-md px-5">
+          <div className="panel-shell overflow-hidden shadow-pop">
+            <div className="h-px bg-gradient-to-r from-amber-500 via-amber-400 to-transparent" />
+            <div className="flex flex-col items-center gap-6 px-7 py-10 text-center">
+              {/* Ícone — tom âmbar (neutro, não crítico) */}
+              <span className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50 text-amber-600">
+                <Ban className="h-6 w-6" aria-hidden="true" />
+              </span>
 
-        <div className="relative mx-auto flex min-h-screen max-w-4xl items-center justify-center px-6 py-8 md:px-10">
-          <section className="panel-shell animate-slide-up w-full max-w-3xl overflow-hidden border-white/85 bg-white/88 shadow-[0_35px_120px_rgba(15,25,35,0.12)] backdrop-blur-xl">
-            <div className="h-px bg-gradient-to-r from-[#B42318] via-[#F59E0B] to-transparent" />
-            <div className="flex flex-col items-center gap-8 px-8 py-12 text-center md:px-14 md:py-16">
-              <div className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-[#F4D7D7] bg-[#FFF1F1] text-[#B42318] shadow-sm">
-                <Ban className="h-7 w-7" aria-hidden="true" />
-              </div>
-
-              <div className="space-y-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C07E6A]">
-                  Acesso restrito
+              <div className="space-y-2">
+                <p className="section-label before:hidden text-amber-600">
+                  Acesso não liberado
                 </p>
-                <h1 className="mx-auto max-w-2xl text-[2.5rem] font-semibold leading-[1.02] tracking-[-0.05em] md:text-[3.2rem]">
-                  Voce nao tem permissao para acessar esta aba.
+                <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+                  Acesso ainda não liberado
                 </h1>
-                <p className="mx-auto max-w-xl text-[15px] leading-8 text-[#5C6B7A] md:text-[16px]">
-                  Se voce acredita que isso e um engano, contacte o administrador do CRM.
+                <p className="text-[13px] leading-6 text-slate-500">
+                  Solicite a permissão ao administrador do CRM.
                 </p>
               </div>
 
-              <div className="rounded-[22px] border border-[#F0E4E0] bg-[#FFF8F5] px-5 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C07E6A]">
-                  Credencial recebida
-                </p>
-                <p className="mt-3 break-all font-mono text-sm leading-7 text-[#7A2E1F]">
-                  {receivedCredential}
-                </p>
+              {/* CTA: solicitar acesso */}
+              <a
+                href={mailtoHref}
+                className="inline-flex h-9 items-center gap-2 rounded-[var(--radius-md)] bg-slate-900 px-4 text-[13px] font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clinic-blue"
+              >
+                <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                Solicitar acesso
+              </a>
+
+              {/* Detalhes técnicos colapsáveis */}
+              <div className="w-full">
+                <button
+                  type="button"
+                  onClick={() => setTechOpen((v) => !v)}
+                  aria-expanded={techOpen}
+                  className="flex w-full items-center justify-between text-[11px] text-slate-400 hover:text-slate-600 focus-visible:outline-none"
+                >
+                  <span>Ver detalhes técnicos</span>
+                  <ChevronDown
+                    className={cn("h-3.5 w-3.5 transition-transform", techOpen && "rotate-180")}
+                    aria-hidden="true"
+                  />
+                </button>
+                {techOpen && (
+                  <div className="mt-2 rounded-[var(--radius-md)] bg-slate-50 px-3 py-2.5">
+                    <p className="break-all font-mono text-[12px] text-slate-500">
+                      {receivedCredential}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-          </section>
+          </div>
         </div>
       </div>
     );
   }
 
+  /* ── Denied com AccessShell (account / operations) ── */
   const title = isOperationsDenied
-    ? "Sua conta nao possui permissao para o Operacional."
-    : isAccountDenied
-    ? userId
-      ? "Sua conta nao possui permissao para este acesso."
-      : "Sua conta ainda nao possui permissao para acessar o dashboard."
-    : "Voce nao tem permissao para acessar esta aba.";
+    ? "Sua conta não possui permissão para o Operacional"
+    : userId
+      ? "Sua conta não possui permissão para este acesso"
+      : "Sua conta ainda não possui permissão para o dashboard";
 
   const description = isOperationsDenied
-    ? "A autenticacao foi concluida, mas este email nao esta liberado para o Operacional. Solicite a revisao do acesso ao administrador do CRM."
-    : isAccountDenied
-    ? userId
-      ? "A autenticacao foi concluida, mas a conta atual nao possui vinculo ativo com o userid informado. Se isso estiver incorreto, solicite a revisao do acesso ao administrador do CRM."
-      : "A autenticacao foi concluida, mas nenhuma permissao ativa foi encontrada para a conta atual. Solicite a liberacao ao administrador do CRM."
-    : "Se voce acredita que isso e um engano, contacte o administrador do CRM.";
-
-  const statusText = isOperationsDenied
-    ? "Autenticacao concluida, mas sem permissao ativa para o Operacional."
-    : isAccountDenied
-    ? "Autenticacao concluida, mas sem permissao ativa para este painel."
-    : "Acesso negado.";
-
-  const actionText = isOperationsDenied
-    ? "Solicite a liberacao do email em public.operations_access."
-    : isAccountDenied
-    ? "Solicite a associacao da sua conta com o acesso correto no CRM."
-    : "Solicite a liberacao do seu usuario junto ao administrador do CRM.";
-
-  const detailText = isOperationsDenied
-    ? "Nenhuma permissao operacional ativa foi localizada para a conta autenticada."
-    : isAccountDenied
-    ? userId
-      ? "A conta autenticada nao possui vinculo com o userid solicitado."
-      : "Nenhuma permissao ativa foi localizada para a conta autenticada."
-    : "O userid informado nao possui acesso a esta aba.";
+    ? "A autenticação foi concluída, mas este email não está liberado para o Operacional. Solicite a revisão ao administrador."
+    : userId
+      ? "A autenticação foi concluída, mas a conta atual não possui vínculo ativo com o userid informado."
+      : "A autenticação foi concluída, mas nenhuma permissão ativa foi encontrada. Solicite a liberação.";
 
   return (
     <AccessShell
@@ -106,77 +111,92 @@ const AccessDenied = ({ userId, mode = "userid" }: AccessDeniedProps) => {
       highlights={[
         {
           label: "Status",
-          value: statusText,
+          value: isOperationsDenied
+            ? "Autenticado, sem permissão para o Operacional."
+            : "Autenticado, sem permissão para este painel.",
         },
         {
-          label: "Parametro",
-          value: <span className="font-mono text-[13px]">{receivedCredential}</span>,
+          label: "Credencial",
+          value: <span className="font-mono text-[12px]">{receivedCredential}</span>,
         },
         {
-          label: "Acao",
-          value: actionText,
+          label: "Ação",
+          value: isOperationsDenied
+            ? "Solicite liberação em public.operations_access."
+            : "Solicite associação da conta ao acesso correto.",
         },
       ]}
     >
-      <div className="relative overflow-hidden">
-        <div className="border-b border-[#F0E4E0] bg-[linear-gradient(180deg,#FFF8F5_0%,#FFFFFF_100%)] px-7 py-7">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[18px] border border-[#F4D7D7] bg-[#FFF1F1] text-[#B42318] shadow-sm">
-              <Ban className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C07E6A]">
-                Controle de acesso
-              </p>
-              <h2 className="text-[1.9rem] font-semibold leading-none tracking-[-0.04em] text-[#0F1923]">
-                Permissao nao encontrada
+      <div className="flex h-full flex-col">
+        {/* Header */}
+        <div className="border-b border-slate-100 bg-rose-50/40 px-7 py-6">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 text-rose-600 shadow-sm">
+              <Ban className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="section-label before:hidden text-rose-600">Controle de acesso</p>
+              <h2 className="text-lg font-semibold leading-tight text-slate-900">
+                Permissão não encontrada
               </h2>
-              <p className="max-w-sm text-sm leading-7 text-[#6A5B58]">
-                {detailText}
-              </p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-6 px-7 py-7">
-          <div className="rounded-[22px] border border-[#F0E4E0] bg-[#FFF8F5] p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C07E6A]">
-              Credencial recebida
+        {/* Corpo */}
+        <div className="flex-1 space-y-4 px-7 py-6">
+          {/* O que verificar */}
+          <div className="rounded-[var(--radius-md)] border border-slate-100 bg-slate-50 p-4">
+            <p className="mb-2.5 text-[12px] font-semibold text-slate-600">
+              O que verificar agora
             </p>
-            <p className="mt-3 break-all font-mono text-sm leading-7 text-[#7A2E1F]">
-              {receivedCredential}
-            </p>
+            <ul className="space-y-1.5 text-[12px] leading-6 text-slate-500 list-none">
+              {isOperationsDenied ? (
+                <>
+                  <li>• Confirme se entrou com o email correto.</li>
+                  <li>• Verifique se está ativo em <code className="rounded bg-slate-200 px-1 font-mono text-[11px]">operations_access</code>.</li>
+                  <li>• Somente emails liberados acessam o Operacional.</li>
+                </>
+              ) : (
+                <>
+                  <li>• Confirme se o link foi aberto com o <code className="rounded bg-slate-200 px-1 font-mono text-[11px]">userid</code> correto.</li>
+                  <li>• Verifique se a conta está vinculada ao acesso esperado.</li>
+                  <li>• Se inesperado, revise as permissões no CRM.</li>
+                </>
+              )}
+            </ul>
           </div>
 
-          <div className="rounded-[22px] border border-[#E7ECF2] bg-[#FAFCFD] p-5">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-white text-[#B42318] shadow-sm">
-                <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+          {/* CTA */}
+          <a
+            href={mailtoHref}
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-slate-900 text-[13px] font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clinic-blue"
+          >
+            <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+            Solicitar acesso
+          </a>
+
+          {/* Detalhes técnicos colapsáveis */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setTechOpen((v) => !v)}
+              aria-expanded={techOpen}
+              className="flex w-full items-center justify-between text-[11px] text-slate-400 hover:text-slate-600 focus-visible:outline-none"
+            >
+              <span>Ver detalhes técnicos</span>
+              <ChevronDown
+                className={cn("h-3.5 w-3.5 transition-transform", techOpen && "rotate-180")}
+                aria-hidden="true"
+              />
+            </button>
+            {techOpen && (
+              <div className="mt-2 rounded-[var(--radius-md)] bg-slate-50 px-3 py-2.5">
+                <p className="break-all font-mono text-[12px] text-slate-500">
+                  {receivedCredential}
+                </p>
               </div>
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-[#0F1923]">O que verificar agora</p>
-                <div className="space-y-2 text-sm leading-7 text-[#5C6B7A]">
-                  {isOperationsDenied ? (
-                    <>
-                      <p>Confirme se voce entrou com o email correto.</p>
-                      <p>Verifique se este email esta ativo em <span className="font-mono">public.operations_access</span>.</p>
-                      <p>Somente emails liberados acessam o Operacional.</p>
-                    </>
-                  ) : isAccountDenied ? (
-                    <>
-                      <p>Confirme se o link foi aberto com o <span className="font-mono">userid</span> correto.</p>
-                      <p>Verifique se a conta autenticada esta vinculada ao acesso esperado.</p>
-                      <p>Se o bloqueio nao era esperado, revise as permissoes configuradas no CRM.</p>
-                    </>
-                  ) : (
-                    <>
-                      <p>Voce nao tem permissao para acessar esta aba.</p>
-                      <p>Se acredita que isso e um engano, contacte o administrador do CRM.</p>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

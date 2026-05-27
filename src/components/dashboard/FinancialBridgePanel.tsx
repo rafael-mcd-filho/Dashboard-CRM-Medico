@@ -1,6 +1,16 @@
+import {
+  Bar,
+  BarChart,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { PanelTitle } from "@/components/dashboard/PanelTitle";
 import type { MetricComparison } from "@/lib/comparison";
-import { fmtPct } from "@/lib/fmt";
+import { fmtBRL, fmtPct } from "@/lib/fmt";
 
 type FinancialBridgePanelProps = {
   title: string;
@@ -10,43 +20,37 @@ type FinancialBridgePanelProps = {
   bruto: string;
   custos: string;
   liquido: string;
+  brutoRaw: number;
+  custosRaw: number;
+  liquidoRaw: number;
   margemRatio: number;
 };
 
-function FinancialMetric({
-  label,
-  value,
-  tone = "default",
+/* ── Tooltip customizado para o waterfall ── */
+function WaterfallTooltip({
+  active,
+  payload,
 }: {
-  label: string;
-  value: string;
-  tone?: "default" | "warning" | "success";
+  active?: boolean;
+  payload?: Array<{ payload?: { label: string; displayValue: number; type: string } }>;
 }) {
-  const toneClass =
-    tone === "warning"
-      ? "text-clinic-amber"
-      : tone === "success"
-        ? "text-clinic-green"
-        : "text-[#0F1923]";
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+
+  const colorMap: Record<string, string> = {
+    positive: "#059669",
+    negative: "#D97706",
+    result: "#1A56DB",
+  };
 
   return (
-    <div className="rounded-[18px] border border-[#E2E6EB] bg-white p-3 shadow-[0_8px_24px_rgba(15,25,35,0.04)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9BAAB8]">
-        {label}
+    <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs shadow-card">
+      <p className="font-medium text-[#0F1923]">{row.label}</p>
+      <p style={{ color: colorMap[row.type] ?? "#5C6B7A" }}>
+        {row.type === "negative" ? "− " : ""}
+        {fmtBRL(row.displayValue)}
       </p>
-      <div className={`mt-2.5 font-mono text-[1.65rem] font-bold leading-none tracking-[-0.05em] ${toneClass}`}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function FinancialSeparator({ symbol }: { symbol: string }) {
-  return (
-    <div className="hidden items-center justify-center xl:flex">
-      <span className="rounded-full border border-[#E2E6EB] bg-[#F8FAFC] px-2.5 py-1.5 text-xs font-semibold text-[#9BAAB8]">
-        {symbol}
-      </span>
     </div>
   );
 }
@@ -59,63 +63,152 @@ export function FinancialBridgePanel({
   bruto,
   custos,
   liquido,
+  brutoRaw,
+  custosRaw,
+  liquidoRaw,
   margemRatio,
 }: FinancialBridgePanelProps) {
+  /* Dados do waterfall:
+   * - "base" é a barra invisível que empurra a barra visível para cima
+   * - "bar" é a barra visível
+   * Bruto:  base=0, bar=bruto (começa do zero, cresce até bruto)
+   * Custos: base=liquido, bar=custos (a fatia subtraída, começa de liquido até bruto)
+   * Líquido:base=0, bar=liquido (resultado, começa do zero)
+   */
+  const waterfallData = [
+    {
+      label: "Faturamento Bruto",
+      base: 0,
+      bar: brutoRaw,
+      displayValue: brutoRaw,
+      type: "positive",
+    },
+    {
+      label: "Custos Diretos",
+      base: liquidoRaw,
+      bar: custosRaw,
+      displayValue: custosRaw,
+      type: "negative",
+    },
+    {
+      label: "Valor Líquido",
+      base: 0,
+      bar: liquidoRaw,
+      displayValue: liquidoRaw,
+      type: "result",
+    },
+  ];
+
+  const BAR_COLORS: Record<string, string> = {
+    positive: "#059669",
+    negative: "#D97706",
+    result: "#1A56DB",
+  };
+
   return (
     <div className="panel-shell p-4">
-      <PanelTitle
-        title={title}
-        tooltip={tooltip}
-        comparison={comparison}
-      />
+      <PanelTitle title={title} tooltip={tooltip} comparison={comparison} />
 
       {isLoading ? (
         <div className="space-y-3">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-20 animate-pulse rounded-[18px] bg-[#F0F3F6]"
-              />
-            ))}
-          </div>
-          <div className="h-20 animate-pulse rounded-[18px] bg-[#F0F3F6]" />
+          <div className="skeleton h-44 w-full" />
+          <div className="skeleton h-16 w-full" />
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] xl:items-center">
-            <FinancialMetric label="Faturamento bruto" value={bruto} />
-            <FinancialSeparator symbol="-" />
-            <FinancialMetric label="Custos diretos" value={custos} tone="warning" />
-            <FinancialSeparator symbol="=" />
-            <FinancialMetric label="Valor líquido" value={liquido} tone="success" />
+        <div className="space-y-4">
+          {/* ── Waterfall chart ── */}
+          <ResponsiveContainer width="100%" height={180} aria-label="Gráfico waterfall de resultado financeiro">
+            <BarChart
+              data={waterfallData}
+              margin={{ left: 8, right: 16, top: 8, bottom: 0 }}
+              barCategoryGap="35%"
+            >
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: "#5C6B7A" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#9BAAB8" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => fmtBRL(v)}
+                width={72}
+              />
+              <Tooltip content={<WaterfallTooltip />} cursor={{ fill: "#F0F3F6" }} />
+
+              {/* Barra invisível — base flutuante */}
+              <Bar dataKey="base" stackId="bridge" fill="transparent" isAnimationActive={false} />
+
+              {/* Barra visível — valor real */}
+              <Bar dataKey="bar" stackId="bridge" radius={[4, 4, 0, 0]}>
+                {waterfallData.map((entry) => (
+                  <Cell
+                    key={entry.label}
+                    fill={BAR_COLORS[entry.type] ?? "#1A56DB"}
+                    opacity={0.9}
+                  />
+                ))}
+                <LabelList
+                  dataKey="displayValue"
+                  position="top"
+                  formatter={(v: number) => fmtBRL(v)}
+                  style={{ fontSize: 10, fill: "#5C6B7A", fontWeight: 600 }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+
+          {/* ── Linha de resumo: 3 valores + margem ── */}
+          <div className="grid grid-cols-3 divide-x divide-slate-100 rounded-[var(--radius-md)] border border-slate-100 bg-white">
+            <div className="px-4 py-3">
+              <p className="section-label text-clinic-green">Bruto</p>
+              <p className="mt-1.5 font-mono text-[0.95rem] font-bold text-slate-900 tabular-nums">
+                {bruto}
+              </p>
+            </div>
+            <div className="px-4 py-3">
+              <p className="section-label text-clinic-amber">Custos</p>
+              <p className="mt-1.5 font-mono text-[0.95rem] font-bold text-clinic-amber tabular-nums">
+                − {custos}
+              </p>
+            </div>
+            <div className="px-4 py-3">
+              <p className="section-label text-clinic-blue">Líquido</p>
+              <p className="mt-1.5 font-mono text-[0.95rem] font-bold text-clinic-blue tabular-nums">
+                {liquido}
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-[20px] border border-[#D7EBDD] bg-[linear-gradient(135deg,#FFFFFF_0%,#F2FBF6_100%)] p-4 shadow-[0_10px_28px_rgba(15,25,35,0.05)]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          {/* ── Margem ── */}
+          <div className="rounded-[var(--radius-md)] border border-[#BBF7D0] bg-gradient-to-br from-white to-[#F0FDF4] px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9BAAB8]">
-                  Margem sobre o bruto
-                </p>
-                <div className="mt-2.5 font-mono text-[2rem] font-bold leading-none tracking-[-0.07em] text-clinic-green">
+                <p className="section-label text-clinic-green">Margem sobre o bruto</p>
+                <div className="mt-1.5 font-mono text-[1.5rem] font-bold leading-none tracking-[-0.03em] text-clinic-green tabular-nums">
                   {fmtPct(margemRatio)}
                 </div>
               </div>
-
-              <p className="max-w-[38ch] text-[13px] leading-5 text-[#5C6B7A]">
-                Mostra quanto do faturamento bruto permanece como resultado líquido
-                depois dos custos lançados no período.
-              </p>
-            </div>
-
-            <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[#DCEEE3]">
-              <div
-                className="h-full rounded-full transition-[width] duration-300"
-                style={{
-                  width: `${Math.max(0, Math.min(100, margemRatio * 100))}%`,
-                  backgroundColor: "#0E9F6E",
-                }}
-              />
+              <div className="flex-1">
+                <div className="h-2.5 overflow-hidden rounded-full bg-[#DCFCE7]">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-500"
+                    role="progressbar"
+                    aria-valuenow={Math.round(margemRatio * 100)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    style={{
+                      width: `${Math.max(0, Math.min(100, margemRatio * 100))}%`,
+                      backgroundColor: "#059669",
+                    }}
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] text-slate-500">
+                  Resultado líquido após os custos do período
+                </p>
+              </div>
             </div>
           </div>
         </div>

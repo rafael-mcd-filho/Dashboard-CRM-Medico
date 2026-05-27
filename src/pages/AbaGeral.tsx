@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
+  AlertTriangle,
+  ArrowRightLeft,
   Clock3,
   LayoutDashboard,
   Target,
@@ -20,6 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import { CrossFunnelPanel } from "@/components/dashboard/CrossFunnelPanel";
+import { EmptyChart } from "@/components/dashboard/EmptyChart";
 import { HeroMetricCard } from "@/components/dashboard/HeroMetricCard";
 import { LossDiagnosticsPanel } from "@/components/dashboard/LossDiagnosticsPanel";
 import { LossReasonsPanel } from "@/components/dashboard/LossReasonsPanel";
@@ -32,6 +35,17 @@ import { getDateModeLabel } from "@/lib/dateMode";
 import { getEvolucaoBucketLabel } from "@/lib/evolucao";
 import type { FunnelStageDrilldownRecord } from "@/lib/funnelDrilldown";
 import { fmtBRL, fmtDecimal, fmtNum, fmtPct } from "@/lib/fmt";
+import { cn } from "@/lib/utils";
+
+/* ── Divisor de seção com label premium ── */
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-1">
+      <p className="section-label shrink-0 before:hidden">{title}</p>
+      <div className="flex-1 border-t border-slate-200" aria-hidden="true" />
+    </div>
+  );
+}
 
 const FUNIL_LINE_COLORS = {
   consultas: "#1A56DB",
@@ -89,13 +103,24 @@ function VolumeTooltip({
   );
 }
 
-function EmptyChart({ label = "Sem dados no período" }: { label?: string }) {
-  return (
-    <div className="flex h-44 items-center justify-center text-sm text-[#9BAAB8]">
-      {label}
-    </div>
-  );
-}
+
+/* Keys for "Evolução por funil" interactive legend */
+const FUNIL_KEYS = ["consultas", "espirometria", "broncoscopia", "cirurgia"] as const;
+type FunilKey = typeof FUNIL_KEYS[number];
+
+const FUNIL_DOT_SHAPES: Record<FunilKey, "circle" | "square" | "triangle" | "diamond"> = {
+  consultas: "circle",
+  espirometria: "square",
+  broncoscopia: "triangle",
+  cirurgia: "diamond",
+};
+
+const FUNIL_LABELS: Record<FunilKey, string> = {
+  consultas: "Consultas",
+  espirometria: "Espirometria",
+  broncoscopia: "Broncoscopia",
+  cirurgia: "Cirurgia",
+};
 
 export default function AbaGeral() {
   const d = useVisaoGeralData();
@@ -110,6 +135,17 @@ export default function AbaGeral() {
     accentColor: string;
     records: FunnelStageDrilldownRecord[];
   } | null>(null);
+
+  /* Interactive legend for "Evolução por funil" */
+  const [hiddenFunis, setHiddenFunis] = useState<Set<FunilKey>>(new Set());
+  const toggleFunil = useCallback((key: FunilKey) => {
+    setHiddenFunis((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   return (
     <div className="animate-fade-in space-y-5">
@@ -126,7 +162,10 @@ export default function AbaGeral() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {/* ══ VISÃO EXECUTIVA ══ */}
+      <SectionHeader title="Visão Executiva" />
+
+      <div className="animate-stagger grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <HeroMetricCard
           label="Leads novos"
           value={fmtNum(d.leads_novos)}
@@ -146,6 +185,7 @@ export default function AbaGeral() {
           tone="teal"
           isLoading={d.isLoading}
           comparison={d.comparisons?.kpis.fat_total}
+          trend={d.evolucao_total?.map((p) => p.value)}
         />
         <HeroMetricCard
           label="Taxa de realização"
@@ -170,8 +210,12 @@ export default function AbaGeral() {
           tone="amber"
           isLoading={d.isLoading}
           comparison={d.comparisons?.kpis.prazo_medio_geral}
+          inverseSentiment
         />
       </div>
+
+      {/* ══ PERFORMANCE ══ */}
+      <SectionHeader title="Performance" />
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.95fr)]">
         <PresenceConversionPanel
@@ -184,22 +228,53 @@ export default function AbaGeral() {
 
         <CrossFunnelPanel
           title="Contatos de consultas em outros funis"
-          tooltip="Mostra quantos contatos da base atual de consultas também aparecem em espirometria, broncoscopia ou cirurgia dentro do mesmo filtro."
+          tooltip="Mostra quantos contatos da base atual de consultas também aparecem em espirometria, broncoscopia ou cirurgia dentro do mesmo filtro. Clique em um item para ver os registros."
           items={d.cross_funnel}
           baseValue={d.consulta_base_contatos}
           baseLabel="Base de consultas"
           comparison={d.comparisons?.charts.cross_funnel}
           isLoading={d.isLoading}
+          onItemClick={(name) => {
+            const records = (d.registros_funis ?? []).filter(
+              (r) => r.meta?.funil === name && r.meta?.base === "agendadas"
+            );
+            if (!records.length) return;
+            setSheetState({
+              title: `Contatos do funil ${name}`,
+              description: "Registros do funil selecionado que também possuem consultas no período.",
+              contextLabel: `Funil: ${name}`,
+              badgeLabel: "Cross-funnel",
+              accentColor: d.cross_funnel.find((i) => i.name === name)?.color ?? "#1A56DB",
+              records,
+            });
+          }}
         />
       </div>
+
+      {/* ══ DIAGNÓSTICO DE PERDA ══ */}
+      <SectionHeader title="Diagnóstico de Perda" />
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <LossReasonsPanel
           title="Motivos de perda consolidados"
-          tooltip="Consolida apenas os cards na etapa Perdido dos quatro funis. Cada card usa o mapa de tags do seu próprio funil; quando nenhum ID é reconhecido, entra como Sem motivo mapeado."
+          tooltip="Consolida apenas os cards na etapa Perdido dos quatro funis. Cada card usa o mapa de tags do seu próprio funil; quando nenhum ID é reconhecido, entra como Sem motivo mapeado. Clique em uma barra para ver os registros perdidos."
           items={d.motivos_perda}
           comparison={d.comparisons?.charts.motivos_perda}
           isLoading={d.isLoading}
+          onBarClick={(_name) => {
+            const records = (d.registros_funis ?? []).filter(
+              (r) => r.etapa.toLowerCase().includes("perdido")
+            );
+            if (!records.length) return;
+            setSheetState({
+              title: "Registros perdidos consolidados",
+              description: "Todos os cards na etapa Perdido dos quatro funis no período atual.",
+              contextLabel: "Etapa: Perdido",
+              badgeLabel: "Motivos de perda",
+              accentColor: "#6B7280",
+              records,
+            });
+          }}
         />
         <LossDiagnosticsPanel
           title="Diagnóstico de perdas consolidado"
@@ -213,6 +288,9 @@ export default function AbaGeral() {
         />
       </div>
 
+      {/* ══ FINANCEIRO ══ */}
+      <SectionHeader title="Financeiro" />
+
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <div className="panel-shell p-4">
           <PanelTitle
@@ -221,7 +299,7 @@ export default function AbaGeral() {
             comparison={d.comparisons?.charts.fat_por_funil}
           />
           {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
+            <div className="skeleton h-44 w-full" />
           ) : d.fat_por_funil.length === 0 ? (
             <EmptyChart />
           ) : (
@@ -289,7 +367,7 @@ export default function AbaGeral() {
             comparison={d.comparisons?.charts.volume_por_funil}
           />
           {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
+            <div className="skeleton h-44 w-full" />
           ) : (
             <ResponsiveContainer
               width="100%"
@@ -382,6 +460,12 @@ export default function AbaGeral() {
                     />
                   ))}
                 </Bar>
+                <Bar
+                  dataKey="noShow"
+                  name="No-show"
+                  fill="#F59E0B"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -395,7 +479,7 @@ export default function AbaGeral() {
           comparison={d.comparisons?.charts.evolucao_total}
         />
         {d.isLoading ? (
-          <div className="h-48 animate-pulse rounded-lg bg-[#F0F3F6]" />
+          <div className="skeleton h-48 w-full" />
         ) : (
           <ResponsiveContainer
             width="100%"
@@ -469,8 +553,39 @@ export default function AbaGeral() {
           tooltip={`Mostra a evolução do faturamento bruto de cada funil usando a mesma base de realizados aplicada nas abas específicas. Os pontos seguem a ${getDateModeLabel(tipoData)} selecionada no filtro global.`}
           comparison={d.comparisons?.charts.evolucao_por_funil}
         />
+
+        {/* Interactive legend — click to isolate/hide a line */}
+        {!d.isLoading && (
+          <div className="mb-3 flex flex-wrap gap-3">
+            {FUNIL_KEYS.map((key) => {
+              const hidden = hiddenFunis.has(key);
+              const color = FUNIL_LINE_COLORS[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleFunil(key)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
+                    hidden
+                      ? "border-slate-200 bg-white text-[#9BAAB8] opacity-50"
+                      : "border-transparent bg-[#F0F3F6] text-[#0F1923]"
+                  )}
+                  title={hidden ? `Mostrar ${FUNIL_LABELS[key]}` : `Ocultar ${FUNIL_LABELS[key]}`}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: hidden ? "#CBD5E1" : color }}
+                  />
+                  {FUNIL_LABELS[key]}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {d.isLoading ? (
-          <div className="h-48 animate-pulse rounded-lg bg-[#F0F3F6]" />
+          <div className="skeleton h-48 w-full" />
         ) : (
           <ResponsiveContainer
             width="100%"
@@ -497,11 +612,6 @@ export default function AbaGeral() {
                 width={72}
               />
               <Tooltip content={<TooltipBRL />} />
-              <Legend
-                iconType="circle"
-                iconSize={8}
-                wrapperStyle={{ fontSize: 12, color: "#5C6B7A" }}
-              />
               <Line
                 type="monotone"
                 dataKey="consultas"
@@ -510,6 +620,8 @@ export default function AbaGeral() {
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                hide={hiddenFunis.has("consultas")}
+                legendType={FUNIL_DOT_SHAPES.consultas}
               />
               <Line
                 type="monotone"
@@ -519,6 +631,8 @@ export default function AbaGeral() {
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                hide={hiddenFunis.has("espirometria")}
+                legendType={FUNIL_DOT_SHAPES.espirometria}
               />
               <Line
                 type="monotone"
@@ -528,6 +642,8 @@ export default function AbaGeral() {
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                hide={hiddenFunis.has("broncoscopia")}
+                legendType={FUNIL_DOT_SHAPES.broncoscopia}
               />
               <Line
                 type="monotone"
@@ -537,11 +653,137 @@ export default function AbaGeral() {
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+                hide={hiddenFunis.has("cirurgia")}
+                legendType={FUNIL_DOT_SHAPES.cirurgia}
               />
             </LineChart>
           </ResponsiveContainer>
         )}
       </div>
+
+      {/* ══ INDICADORES AVANÇADOS ══ */}
+      <SectionHeader title="Indicadores Avançados" />
+
+      {(() => {
+        /* Custo de oportunidade do no-show */
+        const totalNoShow =
+          d.consultas_no_show +
+          d.consultas_no_show_retorno +
+          d.espiro_no_show +
+          d.bronco_no_show +
+          d.bronco_no_show_retorno +
+          d.cirurgia_no_show +
+          d.cirurgia_no_show_retorno;
+
+        const ticketMedioGlobal =
+          d.total_realizadas > 0 ? d.fat_total / d.total_realizadas : 0;
+
+        const custoOportunidadeNoShow = totalNoShow * ticketMedioGlobal;
+
+        /* Conversão captação → realizado */
+        const convCaptacaoRealizado =
+          d.leads_novos > 0 ? d.total_realizadas / d.leads_novos : 0;
+
+        /* Taxa de no-show consolidada */
+        const taxaNoShowTotal =
+          d.total_agendadas > 0 ? totalNoShow / d.total_agendadas : 0;
+
+        return (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {/* Custo de oportunidade do no-show */}
+            <div className="panel-shell p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[#FFF7ED] text-clinic-amber">
+                    <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <p className="section-label text-clinic-amber">Custo de oportunidade — No-show</p>
+                </div>
+              </div>
+              {d.isLoading ? (
+                <div className="mt-3 skeleton h-8 w-28" />
+              ) : (
+                <div className="mt-3">
+                  <p className="kpi-value-lg text-slate-900">{fmtBRL(custoOportunidadeNoShow)}</p>
+                  <p className="mt-1.5 text-[12px] text-slate-500">
+                    {fmtNum(totalNoShow)} no-show × {fmtBRL(ticketMedioGlobal)} ticket médio
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Receita potencial não capturada pelo não-comparecimento consolidado de todos os funis.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Conversão captação → realizado */}
+            <div className="panel-shell p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[#EEF4FF] text-clinic-blue">
+                    <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <p className="section-label text-clinic-blue">Conversão captação → realizado</p>
+                </div>
+              </div>
+              {d.isLoading ? (
+                <div className="mt-3 skeleton h-8 w-28" />
+              ) : (
+                <div className="mt-3">
+                  <p className="kpi-value-lg text-slate-900">{fmtPct(convCaptacaoRealizado)}</p>
+                  <p className="mt-1.5 text-[12px] text-slate-500">
+                    {fmtNum(d.total_realizadas)} realizados ÷ {fmtNum(d.leads_novos)} leads
+                  </p>
+                  <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-clinic-blue transition-[width] duration-500"
+                      style={{ width: `${Math.min(100, convCaptacaoRealizado * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Taxa de aproveitamento da base de novos leads para resultados efetivos.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* No-show consolidado */}
+            <div className="panel-shell p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[#FEF2F2] text-red-500">
+                    <Target className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <p className="section-label text-red-500">Taxa de no-show consolidada</p>
+                </div>
+              </div>
+              {d.isLoading ? (
+                <div className="mt-3 skeleton h-8 w-28" />
+              ) : (
+                <div className="mt-3">
+                  <p className="kpi-value-lg text-slate-900">{fmtPct(taxaNoShowTotal)}</p>
+                  <p className="mt-1.5 text-[12px] text-slate-500">
+                    {fmtNum(totalNoShow)} não compareceram de {fmtNum(d.total_agendadas)} agendados
+                  </p>
+                  <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-red-400 transition-[width] duration-500"
+                      style={{ width: `${Math.min(100, taxaNoShowTotal * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    No-show consolidado de consultas, espirometria, broncoscopia e cirurgia.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ══ TIME ══ */}
+      {!d.isLoading && d.ranking_responsaveis.length > 0 && (
+        <SectionHeader title="Time" />
+      )}
 
       {!d.isLoading && d.ranking_responsaveis.length > 0 && (
         <div className="panel-shell overflow-hidden">
@@ -553,42 +795,78 @@ export default function AbaGeral() {
             />
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <caption className="sr-only">
-                Ranking de responsáveis por faturamento
-              </caption>
-              <thead>
-                <tr className="border-b border-border bg-[#F7F9FB]">
-                  <th className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-[#9BAAB8]">
-                    Responsável
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-[#9BAAB8]">
-                    Realizados
-                  </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-[#9BAAB8]">
-                    Faturamento
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.ranking_responsaveis.map((row, index) => (
-                  <tr
-                    key={row.name}
-                    className={index % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"}
-                  >
-                    <td className="px-5 py-2.5 font-medium text-[#0F1923]">
-                      {row.name}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-xs text-[#5C6B7A]">
-                      {fmtNum(row.realizados)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-xs text-[#0F1923]">
-                      {fmtBRL(row.faturamento)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {(() => {
+              const maxFat = Math.max(...d.ranking_responsaveis.map((r) => r.faturamento), 1);
+              const maxReal = Math.max(...d.ranking_responsaveis.map((r) => r.realizados), 1);
+              return (
+                <table className="w-full text-sm">
+                  <caption className="sr-only">Ranking de responsáveis por faturamento</caption>
+                  <thead>
+                    <tr className="border-b border-border bg-[#F7F9FB]">
+                      <th className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-[#9BAAB8]">
+                        Responsável
+                      </th>
+                      <th className="px-4 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-[#9BAAB8]">
+                        Realizados
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-[#9BAAB8]" style={{ minWidth: 160 }}>
+                        Faturamento
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.ranking_responsaveis.map((row, index) => {
+                      const fatPct   = maxFat  > 0 ? (row.faturamento / maxFat) * 100 : 0;
+                      const realPct  = maxReal > 0 ? (row.realizados  / maxReal) * 100 : 0;
+                      return (
+                        <tr
+                          key={row.name}
+                          className={index % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"}
+                        >
+                          {/* Responsável com avatar de iniciais */}
+                          <td className="px-5 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EEF4FF] text-[10px] font-semibold text-clinic-blue">
+                                {row.name.slice(0, 2).toUpperCase()}
+                              </span>
+                              <span className="font-medium text-[#0F1923]">{row.name}</span>
+                            </div>
+                          </td>
+                          {/* Realizados com mini barra */}
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                                <div
+                                  className="h-full rounded-full bg-clinic-green transition-[width] duration-300"
+                                  style={{ width: `${realPct}%` }}
+                                />
+                              </div>
+                              <span className="w-8 text-right font-mono text-xs text-[#5C6B7A]">
+                                {fmtNum(row.realizados)}
+                              </span>
+                            </div>
+                          </td>
+                          {/* Faturamento com barra inline */}
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100" style={{ minWidth: 60, maxWidth: 100 }}>
+                                <div
+                                  className="h-full rounded-full bg-clinic-blue transition-[width] duration-300"
+                                  style={{ width: `${fatPct}%` }}
+                                />
+                              </div>
+                              <span className="w-20 shrink-0 text-right font-mono text-xs font-semibold text-[#0F1923]">
+                                {fmtBRL(row.faturamento)}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })()}
           </div>
         </div>
       )}

@@ -12,14 +12,17 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  ArrowUpDown,
   CalendarDays,
-  Eye,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
   Filter,
   Hammer,
   LogOut,
   Search,
   ShieldCheck,
-  SquarePen,
+  X,
 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { CardEditorSheet } from "@/components/operations/CardEditorSheet";
@@ -66,6 +69,7 @@ import {
 import { fmtBRL, fmtNum } from "@/lib/fmt";
 import { parseBRDate } from "@/lib/parse";
 import { useRouteAccess } from "@/lib/routeAccess";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
 
@@ -272,10 +276,18 @@ export default function AbaEmDesenvolvimento() {
   const queryClient = useQueryClient();
   const { data: cards = [], isLoading, error } = useOperacaoCardsData();
   const { canEditOperations, userEmail } = useRouteAccess();
-  const [selectedCard, setSelectedCard] = useState<UnifiedFunnelCard | null>(
-    null
-  );
-  const [sheetMode, setSheetMode] = useState<"view" | "edit">("view");
+  const [selectedCard, setSelectedCard] = useState<UnifiedFunnelCard | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  function openCard(card: UnifiedFunnelCard) {
+    setSelectedCard(card);
+    setIsSheetOpen(true);
+  }
+
+  function closeCardSheet() {
+    setIsSheetOpen(false);
+    setTimeout(() => setSelectedCard(null), 350);
+  }
   const [funnelFilter, setFunnelFilter] = useState<FunnelCardKey | "all">(
     "all"
   );
@@ -292,6 +304,8 @@ export default function AbaEmDesenvolvimento() {
   const [agendamentoShortcut, setAgendamentoShortcut] =
     useState<AgendamentoShortcut>("custom");
   const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState<"nome" | "responsavel" | "agendamento" | "valor" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const deferredSearch = useDeferredValue(search);
   const roleLabel = canEditOperations ? "Editor" : "Somente visualização";
   const agendamentoDateRange = useMemo<DateRange | undefined>(() => {
@@ -346,8 +360,13 @@ export default function AbaEmDesenvolvimento() {
     const normalizedSearch = normalizeSearch(deferredSearch);
 
     return funnelScopedCards.filter((card) => {
+      if (responsavelFilter === "__none__" && (card.responsavel ?? "").trim() !== "") {
+        return false;
+      }
+
       if (
         responsavelFilter !== "__all__" &&
+        responsavelFilter !== "__none__" &&
         (card.responsavel ?? "") !== responsavelFilter
       ) {
         return false;
@@ -425,15 +444,38 @@ export default function AbaEmDesenvolvimento() {
 
   useEffect(() => {
     if (selectedCard && !cards.some((card) => card.id === selectedCard.id)) {
+      setIsSheetOpen(false);
       setSelectedCard(null);
-      setSheetMode("view");
     }
   }, [cards, selectedCard]);
 
+  function handleSortToggle(key: typeof sortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedCards = useMemo(() => {
+    if (!sortKey) return filteredCards;
+    return [...filteredCards].sort((a, b) => {
+      let va: string | number = "";
+      let vb: string | number = "";
+      if (sortKey === "nome") { va = a.nome_contato ?? ""; vb = b.nome_contato ?? ""; }
+      else if (sortKey === "responsavel") { va = a.responsavel ?? ""; vb = b.responsavel ?? ""; }
+      else if (sortKey === "agendamento") { va = a.data_agendamento ?? ""; vb = b.data_agendamento ?? ""; }
+      else if (sortKey === "valor") { va = getValorFaturavel(a); vb = getValorFaturavel(b); }
+      if (typeof va === "string") return sortDir === "asc" ? va.localeCompare(vb as string, "pt-BR") : (vb as string).localeCompare(va, "pt-BR");
+      return sortDir === "asc" ? va - (vb as number) : (vb as number) - va;
+    });
+  }, [filteredCards, sortKey, sortDir]);
+
   const paginatedCards = useMemo(() => {
     const from = (page - 1) * PAGE_SIZE;
-    return filteredCards.slice(from, from + PAGE_SIZE);
-  }, [filteredCards, page]);
+    return sortedCards.slice(from, from + PAGE_SIZE);
+  }, [sortedCards, page]);
 
   const summaryByFunnel = useMemo(() => {
     return (Object.keys(FUNNEL_CARD_META) as FunnelCardKey[]).map((key) => ({
@@ -457,7 +499,6 @@ export default function AbaEmDesenvolvimento() {
     onSuccess: async () => {
       toast.success("Card atualizado com sucesso.");
       setSelectedCard(null);
-      setSheetMode("view");
       await queryClient.invalidateQueries();
     },
     onError: (mutationError: Error) => {
@@ -475,6 +516,15 @@ export default function AbaEmDesenvolvimento() {
 
     queryClient.clear();
   };
+
+  const activeOpFilterCount = [
+    funnelFilter !== "all",
+    responsavelFilter !== "__all__",
+    paymentFilter !== "all",
+    baseFilter !== "scheduled",
+    Boolean(search.trim()),
+    agendamentoFrom !== "" || agendamentoTo !== "",
+  ].filter(Boolean).length;
 
   return (
     <div className="animate-fade-in space-y-5">
@@ -531,7 +581,10 @@ export default function AbaEmDesenvolvimento() {
               onClick={() =>
                 setFunnelFilter((current) => (current === key ? "all" : key))
               }
-              className="panel-shell flex items-center justify-between gap-3 p-4 text-left transition-colors"
+              className={cn(
+                "panel-shell flex items-center justify-between gap-3 p-4 text-left transition-all duration-150",
+                funnelFilter === key && "ring-2 ring-inset ring-clinic-blue"
+              )}
             >
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A97A6]">
@@ -553,11 +606,62 @@ export default function AbaEmDesenvolvimento() {
 
       <div className="panel-shell p-4">
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Filter className="h-4 w-4 text-[#7C8B99]" />
             <h2 className="text-[14px] font-semibold text-[#0F1923]">
               Filtros operacionais
             </h2>
+            {activeOpFilterCount > 0 && (
+              <span className="inline-flex items-center rounded-full border border-[#D8E6FF] bg-[#EEF4FF] px-2 py-0.5 text-[11px] font-semibold leading-none text-clinic-blue">
+                {activeOpFilterCount}
+              </span>
+            )}
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              {[
+                {
+                  label: "Não pagos do mês",
+                  apply: () => {
+                    setPaymentFilter("unpaid");
+                    handleAgendamentoShortcutChange("current_month");
+                    setFunnelFilter("all");
+                    setResponsavelFilter("__all__");
+                    setBaseFilter("scheduled");
+                    setSearch("");
+                  },
+                  isActive:
+                    paymentFilter === "unpaid" &&
+                    agendamentoShortcut === "current_month",
+                },
+                {
+                  label: "Sem responsável",
+                  apply: () => {
+                    setResponsavelFilter("__none__");
+                    setPaymentFilter("all");
+                    setFunnelFilter("all");
+                    setBaseFilter("all");
+                    setSearch("");
+                    setAgendamentoFrom("");
+                    setAgendamentoTo("");
+                    setAgendamentoShortcut("custom");
+                  },
+                  isActive: responsavelFilter === "__none__",
+                },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={preset.apply}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-[11px] font-medium transition-colors",
+                    preset.isActive
+                      ? "border-clinic-blue bg-[#EEF4FF] text-clinic-blue"
+                      : "border-[#D8E0E8] bg-white text-[#5C6B7A] hover:border-clinic-blue hover:text-clinic-blue"
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid items-end gap-3 xl:grid-cols-[minmax(260px,1.4fr)_repeat(4,minmax(150px,0.8fr))_auto]">
@@ -741,15 +845,17 @@ export default function AbaEmDesenvolvimento() {
       </div>
 
       <div className="panel-shell overflow-hidden p-0">
-        <div className="border-b border-[#E2E6EB] px-5 py-4">
-          <h2 className="text-[15px] font-semibold text-[#0F1923]">
-            Lista unificada de cards
-          </h2>
-          <p className="mt-1 text-[13px] text-[#5C6B7A]">
-            {canEditOperations
-              ? "Busque um card específico, visualize os dados consolidados ou edite os campos financeiros permitidos."
-              : "Busque um card específico e visualize os dados consolidados em modo somente leitura."}
-          </p>
+        <div className="flex items-center justify-between gap-3 border-b border-[#E2E6EB] px-5 py-4">
+          <div>
+            <h2 className="text-[15px] font-semibold text-[#0F1923]">
+              Lista unificada de cards
+            </h2>
+            <p className="mt-1 text-[13px] text-[#5C6B7A]">
+              {canEditOperations
+                ? "Busque um card específico, visualize os dados consolidados ou edite os campos financeiros permitidos."
+                : "Busque um card específico e visualize os dados consolidados em modo somente leitura."}
+            </p>
+          </div>
         </div>
 
         {error ? (
@@ -759,10 +865,7 @@ export default function AbaEmDesenvolvimento() {
         ) : isLoading ? (
           <div className="space-y-3 px-5 py-5">
             {Array.from({ length: 8 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-12 animate-pulse rounded-xl bg-[#F1F4F7]"
-              />
+              <div key={index} className="skeleton h-12" />
             ))}
           </div>
         ) : paginatedCards.length === 0 ? (
@@ -779,36 +882,50 @@ export default function AbaEmDesenvolvimento() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-[#FAFBFC] hover:bg-[#FAFBFC]">
-                  <TableHead className="px-5 text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="px-3 text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Funil
                   </TableHead>
-                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Contato
+                  {/* Sortable: Contato */}
+                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    <button type="button" onClick={() => handleSortToggle("nome")} className="inline-flex items-center gap-1 hover:text-slate-700">
+                      Contato
+                      {sortKey === "nome" ? (sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                    </button>
                   </TableHead>
-                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Responsável
+                  {/* Sortable: Responsável */}
+                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    <button type="button" onClick={() => handleSortToggle("responsavel")} className="inline-flex items-center gap-1 hover:text-slate-700">
+                      Responsável
+                      {sortKey === "responsavel" ? (sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                    </button>
                   </TableHead>
-                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Tipo de paciente
+                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    Tipo
                   </TableHead>
-                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Modalidade de pagamento
+                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    Modalidade
                   </TableHead>
-                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Forma de pagamento
+                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    Forma Pgto
                   </TableHead>
-                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Agendamento
+                  {/* Sortable: Agendamento */}
+                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    <button type="button" onClick={() => handleSortToggle("agendamento")} className="inline-flex items-center gap-1 hover:text-slate-700">
+                      Agendamento
+                      {sortKey === "agendamento" ? (sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                    </button>
                   </TableHead>
-                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Valor
+                  {/* Sortable: Valor */}
+                  <TableHead className="text-right text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                    <button type="button" onClick={() => handleSortToggle("valor")} className="inline-flex items-center gap-1 hover:text-slate-700">
+                      Valor
+                      {sortKey === "valor" ? (sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                    </button>
                   </TableHead>
-                  <TableHead className="text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
+                  <TableHead className="text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
                     Pagamento
                   </TableHead>
-                  <TableHead className="pr-5 text-center text-[11px] uppercase tracking-[0.12em] text-[#8A97A6]">
-                    Ação
-                  </TableHead>
+                  <TableHead className="pr-5 w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -820,8 +937,12 @@ export default function AbaEmDesenvolvimento() {
                   const hasPagamentoFinanceiro = hasRecebimentoFinanceiro(card);
 
                   return (
-                    <TableRow key={card.id} className="border-[#EEF2F6]">
-                      <TableCell className="px-5">
+                    <TableRow
+                      key={card.id}
+                      className="border-[#EEF2F6] cursor-pointer transition-colors hover:bg-[#F7F9FC]"
+                      onClick={() => openCard(card)}
+                    >
+                      <TableCell className="px-3">
                         <span
                           className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium ${meta.soft}`}
                         >
@@ -858,7 +979,7 @@ export default function AbaEmDesenvolvimento() {
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium text-[#0F1923]">
+                      <TableCell className="text-right font-medium text-[#0F1923]">
                         {parsedValue > 0 ? fmtBRL(parsedValue) : "-"}
                       </TableCell>
                       <TableCell>
@@ -886,38 +1007,7 @@ export default function AbaEmDesenvolvimento() {
                         </div>
                       </TableCell>
                       <TableCell className="pr-5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 rounded-xl border-[#D8E0E8]"
-                            aria-label="Visualizar card"
-                            title="Visualizar"
-                            onClick={() => {
-                              setSelectedCard(card);
-                              setSheetMode("view");
-                            }}
-                          >
-                            <Eye />
-                          </Button>
-                          {canEditOperations ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9 rounded-xl border-[#D8E0E8]"
-                              aria-label="Editar card"
-                              title="Editar"
-                              onClick={() => {
-                                setSelectedCard(card);
-                                setSheetMode("edit");
-                              }}
-                            >
-                              <SquarePen />
-                            </Button>
-                          ) : null}
-                        </div>
+                        <ChevronRight className="mx-auto h-4 w-4 text-[#C4CDD6]" aria-hidden="true" />
                       </TableCell>
                     </TableRow>
                   );
@@ -959,13 +1049,9 @@ export default function AbaEmDesenvolvimento() {
 
       <CardEditorSheet
         card={selectedCard}
-        mode={sheetMode}
-        open={Boolean(selectedCard)}
+        open={isSheetOpen}
         onOpenChange={(open) => {
-          if (!open) {
-            setSelectedCard(null);
-            setSheetMode("view");
-          }
+          if (!open) closeCardSheet();
         }}
         onSave={async (draft) => {
           if (!canEditOperations) {

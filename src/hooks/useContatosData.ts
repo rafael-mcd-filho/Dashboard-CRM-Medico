@@ -173,16 +173,47 @@ function buildContatosMetrics(
   const multiFunilIdsSet = new Set(multiFunilIds);
   const contatos_multi_funil = multiFunilIds.length;
 
+  // Build a map of contato_id → all card dates across funnels
+  const allFunnelCards = [
+    ...consultasCards,
+    ...broncoCards,
+    ...espiroCards,
+    ...procCards,
+  ];
+  const cardDatesByContact = new Map<string, Date[]>();
+  for (const card of allFunnelCards) {
+    if (!card.contato_id || !multiFunilIdsSet.has(card.contato_id)) continue;
+    const d = parseBRDate(card.data_criacao_card);
+    if (!d) continue;
+    const arr = cardDatesByContact.get(card.contato_id) ?? [];
+    arr.push(d);
+    cardDatesByContact.set(card.contato_id, arr);
+  }
+
+  // Compute average days from 1st to 2nd funnel card entry
+  const diffs: number[] = [];
+  for (const cid of multiFunilIds) {
+    const dates = (cardDatesByContact.get(cid) ?? []).slice().sort((a, b) => a.getTime() - b.getTime());
+    if (dates.length >= 2) {
+      const diff = differenceInDays(dates[1], dates[0]);
+      if (diff >= 0) diffs.push(diff);
+    }
+  }
+  const tempo_medio_segundo_funil =
+    diffs.length > 0 ? diffs.reduce((a, b) => a + b, 0) / diffs.length : 0;
+
   const multiFilnTable = contatos
     .filter((contato) => multiFunilIdsSet.has(contato.contato_id))
     .map((contato) => ({
       contato_id: contato.contato_id,
       nome: contato.nome ?? contato.contato_id,
+      primeira_entrada: contato.criado_em ?? null,
       consultas: consultasCids.has(contato.contato_id),
       broncoscopia: broncoCids.has(contato.contato_id),
       espirometria: espiroCids.has(contato.contato_id),
       procedimentos: procCids.has(contato.contato_id),
-    }));
+    }))
+    .sort((a, b) => (b.primeira_entrada ?? "").localeCompare(a.primeira_entrada ?? ""));
 
   const origemMap: Record<string, number> = {};
   contatos.forEach((contato) => {
@@ -239,6 +270,7 @@ function buildContatosMetrics(
     leads_novos,
     contatos_multi_funil,
     taxa_retencao,
+    tempo_medio_segundo_funil,
     leads_por_origem,
     leads_por_tag,
     evolucao_leads,
@@ -361,11 +393,13 @@ export function useContatosData() {
           leads_novos: current.leads_novos,
           contatos_multi_funil: current.contatos_multi_funil,
           taxa_retencao: current.taxa_retencao,
+          tempo_medio_segundo_funil: current.tempo_medio_segundo_funil,
         },
         {
           leads_novos: previous.leads_novos,
           contatos_multi_funil: previous.contatos_multi_funil,
           taxa_retencao: previous.taxa_retencao,
+          tempo_medio_segundo_funil: previous.tempo_medio_segundo_funil,
         }
       ),
       charts: {

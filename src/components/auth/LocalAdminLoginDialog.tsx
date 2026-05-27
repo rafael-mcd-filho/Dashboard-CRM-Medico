@@ -1,10 +1,11 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { LoaderCircle, LockKeyhole, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, ShieldCheck } from "lucide-react";
 import AccessShell from "@/components/auth/AccessShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 type LocalAdminLoginDialogProps = {
   onSubmit: (credentials: { email: string; password: string }) => Promise<void>;
@@ -19,13 +20,20 @@ const LocalAdminLoginDialog = ({
   isSubmitting,
   accessArea = "dashboard",
 }: LocalAdminLoginDialogProps) => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [showPassword, setShowPass] = useState(false);
+  const [capsLock, setCapsLock]     = useState(false);
+
   const isOperationsAccess = accessArea === "operations";
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     await onSubmit({ email: email.trim(), password });
+  };
+
+  const handleKeyDown = (e: KeyboardEvent | React.KeyboardEvent) => {
+    setCapsLock(e.getModifierState?.("CapsLock") ?? false);
   };
 
   return (
@@ -34,119 +42,145 @@ const LocalAdminLoginDialog = ({
       icon={ShieldCheck}
       tone="blue"
       title={
-        isOperationsAccess ? (
-          <>
-            Acesse a central operacional
-            <br />
-            do CRM com seguranca
-          </>
-        ) : (
-          <>
-            Acesse o painel executivo
-            <br />
-            do CRM com seguranca
-          </>
-        )
+        isOperationsAccess
+          ? "Acesse a central operacional do CRM"
+          : "Acesse o painel executivo do CRM"
       }
       description={
         isOperationsAccess
-          ? "Entre com suas credenciais para visualizar os cards operacionais conforme sua permissao."
-          : "Entre com suas credenciais para visualizar indicadores, funis e acompanhamentos operacionais em um unico ambiente protegido."
+          ? "Entre com suas credenciais para visualizar os cards operacionais conforme sua permissão."
+          : "Entre com suas credenciais para visualizar indicadores, funis e acompanhamentos em um único ambiente."
       }
       highlights={[
         {
-          label: isOperationsAccess ? "Central operacional" : "Visao central",
+          label: isOperationsAccess ? "Central operacional" : "Visão central",
           value: isOperationsAccess
-            ? "Localize cards dos funis em uma tela protegida por login."
-            : "Acompanhe indicadores, conversao e agenda em um so painel.",
+            ? "Cards dos funis em uma tela protegida por login."
+            : "Indicadores, conversão e agenda em um só painel.",
         },
         {
           label: "Acesso protegido",
-          value: "A entrada depende de autenticacao antes da exibicao dos dados.",
+          value: "Autenticação antes da exibição dos dados.",
         },
         {
-          label: "Uso continuo",
+          label: "Uso contínuo",
           value: isOperationsAccess
-            ? "Use sua permissao para consultar ou editar os cards liberados."
-            : "Retome sua rotina com acesso rapido ao panorama do CRM.",
+            ? "Consulte ou edite os cards conforme sua permissão."
+            : "Acesso rápido ao panorama completo do CRM.",
         },
       ]}
     >
-      <div className="relative overflow-hidden">
-        <div className="border-b border-[#E6EDF5] bg-[linear-gradient(180deg,#F7FAFD_0%,#FFFFFF_100%)] px-7 py-7">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[18px] border border-[#D7E5FF] bg-[#EEF4FF] text-[#1A56DB] shadow-sm">
-              <LockKeyhole className="h-5 w-5" aria-hidden="true" />
+      {/* ── Formulário ── */}
+      <div className="flex h-full flex-col">
+        {/* Header do formulário */}
+        <div className="border-b border-slate-100 bg-slate-50/60 px-7 py-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[#DBEAFE] bg-[#EFF6FF] text-clinic-blue shadow-sm">
+              <LockKeyhole className="h-4.5 w-4.5" aria-hidden="true" />
             </div>
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#9BAAB8]">
-                Identificacao
-              </p>
-              <h2 className="text-[1.9rem] font-semibold leading-none tracking-[-0.04em] text-[#0F1923]">
+            <div>
+              <p className="section-label before:hidden text-clinic-blue">Identificação</p>
+              <h2 className="text-xl font-semibold leading-none tracking-tight text-slate-900">
                 {isOperationsAccess ? "Entrar na central" : "Entrar no dashboard"}
               </h2>
-              <p className="max-w-sm text-sm leading-7 text-[#5C6B7A]">
-                Informe seus dados de acesso para continuar.
-              </p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-6 px-7 py-7">
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-                <Label className="text-[#314356]" htmlFor="dashboard-login-email">Email</Label>
-                <Input
-                  id="dashboard-login-email"
-                  type="email"
-                  autoComplete="email"
-                  autoFocus
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="voce@empresa.com"
-                  className="h-12 rounded-[18px] border-[#D8E2EE] bg-[#F8FBFD] px-4 shadow-none focus-visible:ring-clinic-blue"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-[#314356]" htmlFor="dashboard-login-password">Senha</Label>
-                <Input
-                  id="dashboard-login-password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Digite sua senha"
-                className="h-12 rounded-[18px] border-[#D8E2EE] bg-[#F8FBFD] px-4 shadow-none focus-visible:ring-clinic-blue"
+        {/* Corpo do formulário */}
+        <div className="flex-1 space-y-5 px-7 py-6">
+          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+            {/* Email */}
+            <div className="space-y-1.5">
+              <Label htmlFor="login-email" className="text-[13px] font-medium text-slate-700">
+                Email
+              </Label>
+              <Input
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="voce@empresa.com"
+                className="h-10 rounded-[var(--radius-md)] border-slate-200 bg-white shadow-none focus-visible:ring-clinic-blue"
               />
             </div>
 
-            {errorMessage ? (
-              <p className="rounded-[18px] border border-[#F2C9CC] bg-[#FFF5F5] px-4 py-3 text-sm leading-6 text-[#B42318]">
-                {errorMessage}
-              </p>
-            ) : null}
+            {/* Senha */}
+            <div className="space-y-1.5">
+              <Label htmlFor="login-password" className="text-[13px] font-medium text-slate-700">
+                Senha
+              </Label>
+              <div className="relative">
+                <Input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="••••••••"
+                  className="h-10 rounded-[var(--radius-md)] border-slate-200 bg-white pr-10 shadow-none focus-visible:ring-clinic-blue"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass((v) => !v)}
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus-visible:outline-none"
+                >
+                  {showPassword
+                    ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    : <Eye    className="h-4 w-4" aria-hidden="true" />}
+                </button>
+              </div>
 
+              {/* Caps Lock warning */}
+              {capsLock && (
+                <p className="text-[11px] text-amber-600" role="alert">
+                  ⚠ Caps Lock está ativado
+                </p>
+              )}
+            </div>
+
+            {/* Erro de autenticação */}
+            {errorMessage && (
+              <div
+                role="alert"
+                className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3.5 py-3 text-[13px] leading-6 text-red-700"
+              >
+                {errorMessage}
+              </div>
+            )}
+
+            {/* Submit */}
             <Button
-              className="h-12 w-full rounded-[18px] bg-[#1A56DB] text-white shadow-[0_16px_36px_rgba(26,86,219,0.28)] hover:bg-[#164CC3]"
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !email || !password}
+              className={cn(
+                "h-10 w-full rounded-[var(--radius-md)] font-medium transition-all",
+                "bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50",
+                "focus-visible:ring-2 focus-visible:ring-clinic-blue focus-visible:ring-offset-2"
+              )}
             >
               {isSubmitting ? (
-                <>
-                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  Validando acesso
-                </>
+                <span className="flex items-center gap-2">
+                  <span
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                    aria-hidden="true"
+                  />
+                  Validando...
+                </span>
               ) : (
                 "Entrar"
               )}
             </Button>
           </form>
 
-          <p className="text-xs leading-6 text-[#7A8794]">
+          <p className="text-[11px] leading-5 text-slate-400">
             {isOperationsAccess
-              ? "Ao prosseguir, a central operacional sera liberada conforme a permissao configurada para este email."
-              : "Ao prosseguir, o acesso ao dashboard sera liberado conforme as regras configuradas para este ambiente."}
+              ? "Ao prosseguir, a central operacional será liberada conforme a permissão configurada."
+              : "Ao prosseguir, o acesso ao dashboard será liberado conforme as regras configuradas."}
           </p>
         </div>
       </div>
