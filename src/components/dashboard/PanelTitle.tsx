@@ -23,11 +23,17 @@ export function PanelTitle({
 }: PanelTitleProps) {
   return (
     <div className="mb-3 flex flex-wrap items-center gap-1.5">
-      <h3 className="text-[13px] font-semibold text-[#0F1923]">{title}</h3>
+      <h3 className="text-[13px] font-semibold text-slate-800">{title}</h3>
       {tooltip ? (
         <UiTooltip>
           <TooltipTrigger asChild>
-            <Info className="h-3.5 w-3.5 shrink-0 cursor-help text-[#C8D2DC] hover:text-[#9BAAB8]" />
+            <button
+              type="button"
+              aria-label={`Mais informações sobre ${title}`}
+              className="shrink-0 text-slate-300 transition-colors hover:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clinic-blue rounded"
+            >
+              <Info className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs text-xs leading-relaxed" side="top">
             {tooltip}

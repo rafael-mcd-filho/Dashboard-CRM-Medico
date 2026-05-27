@@ -19,6 +19,8 @@ import {
   YAxis,
 } from "recharts";
 import { CrossFunnelPanel } from "@/components/dashboard/CrossFunnelPanel";
+import { EmptyChart } from "@/components/dashboard/EmptyChart";
+import { DistribuicaoTabsPanel } from "@/components/dashboard/DistribuicaoTabsPanel";
 import { FunnelStageSheet } from "@/components/dashboard/FunnelStageSheet";
 import { HeroMetricCard } from "@/components/dashboard/HeroMetricCard";
 import { LossDiagnosticsPanel } from "@/components/dashboard/LossDiagnosticsPanel";
@@ -117,10 +119,12 @@ function ChartTooltipNum({
   );
 }
 
-function EmptyChart({ label = "Sem dados no período" }: { label?: string }) {
+
+function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="flex h-44 items-center justify-center text-sm text-[#9BAAB8]">
-      {label}
+    <div className="flex items-center gap-3 pt-1">
+      <p className="section-label shrink-0 before:hidden">{title}</p>
+      <div className="flex-1 border-t border-slate-200" aria-hidden="true" />
     </div>
   );
 }
@@ -153,6 +157,35 @@ export default function AbaBroncoscopia() {
     }))
     .sort((a, b) => b.agendadas - a.agendadas);
 
+  /* §13 — per-tipo faturamento from full records */
+  const tipoFaturamento = useMemo(() => {
+    const map: Record<string, number> = {};
+    (d.funil_registros ?? []).forEach((r) => {
+      const tipo = (r.meta?.tipoPaciente as string | undefined) ?? "Não definido";
+      if (r.meta?.realizada) {
+        map[tipo] = (map[tipo] ?? 0) + (r.valor ?? 0);
+      }
+    });
+    return map;
+  }, [d.funil_registros]);
+
+  /* §13 — codigos KPIs: media + total */
+  const codigosKpis = useMemo(() => {
+    let totalCodigos = 0;
+    let totalProc = 0;
+    d.por_codigos.forEach((entry) => {
+      const num = parseInt(entry.name, 10);
+      if (!isNaN(num)) {
+        totalCodigos += num * entry.value;
+        totalProc += entry.value;
+      }
+    });
+    return {
+      media: totalProc > 0 ? totalCodigos / totalProc : 0,
+      total: totalCodigos,
+    };
+  }, [d.por_codigos]);
+
   const selectedStageRecords = useMemo(
     () =>
       selectedStage
@@ -177,7 +210,9 @@ export default function AbaBroncoscopia() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <SectionHeader title="Visão" />
+
+      <div className="animate-stagger grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <HeroMetricCard
           label="Agendadas"
           value={fmtNum(d.agendadas)}
@@ -219,6 +254,30 @@ export default function AbaBroncoscopia() {
           comparison={d.comparisons?.kpis.ticket_medio}
         />
       </div>
+
+      {/* §13 — KPIs extras: códigos médios + total de códigos */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <HeroMetricCard
+          label="Códigos médios/broncoscopia"
+          value={codigosKpis.media > 0 ? fmtDecimal(codigosKpis.media, 1) : "—"}
+          description="Média de códigos de procedimento por broncoscopia no período."
+          tooltip="Calculado a partir da distribuição de quantidades de códigos por card agendado. Indica a complexidade média dos procedimentos."
+          icon={Microscope}
+          tone="teal"
+          isLoading={d.isLoading}
+        />
+        <HeroMetricCard
+          label="Total de códigos faturados"
+          value={codigosKpis.total > 0 ? fmtNum(codigosKpis.total) : "—"}
+          description="Soma de todos os códigos de procedimento das broncoscopias no período."
+          tooltip="Soma a quantidade de códigos de cada broncoscopia agendada no período. Um card com 2 códigos contribui com 2 para o total."
+          icon={TrendingUp}
+          tone="purple"
+          isLoading={d.isLoading}
+        />
+      </div>
+
+      <SectionHeader title="Performance" />
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.9fr)]">
         <PerformancePanel
@@ -286,6 +345,8 @@ export default function AbaBroncoscopia() {
         />
       </div>
 
+      <SectionHeader title="Cross-funnel" />
+
       <CrossFunnelPanel
         title="Vínculo com consulta"
         tooltip="Mostra quantos contatos da base atual de broncoscopia também aparecem em consultas dentro do mesmo filtro."
@@ -304,57 +365,64 @@ export default function AbaBroncoscopia() {
         emptyLabel="Sem broncoscopias com contato no período"
       />
 
+      <SectionHeader title="Funil por Etapa" />
+
       <div className="panel-shell p-4">
         <PanelTitle
           title="Funil por etapa"
           tooltip="Mostra quantos cards de broncoscopia estão em cada etapa do funil dentro do filtro atual. A ordem segue o CRM para facilitar a leitura operacional."
           comparison={d.comparisons?.charts.funil}
         />
-        {d.isLoading ? (
-          <div className="h-56 animate-pulse rounded-lg bg-[#F0F3F6]" />
-        ) : d.funil.length === 0 ? (
-          <EmptyChart />
-        ) : (
-          <ResponsiveContainer width="100%" height={Math.max(240, d.funil.length * 38)}>
-            <BarChart
-              data={d.funil}
-              layout="vertical"
-              margin={{ left: 8, right: 48, top: 4, bottom: 0 }}
-            >
-              <XAxis
-                type="number"
-                tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                axisLine={false}
-                tickLine={false}
-                width={168}
-              />
-              <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
-              <Bar
-                dataKey="value"
-                radius={[0, 4, 4, 0]}
-                label={{ position: "right", fontSize: 11, fill: "#9BAAB8" }}
+        {(() => {
+          const funnelItems = d.funil.filter((e) => e.value > 0);
+          return d.isLoading ? (
+            <div className="skeleton h-56" />
+          ) : funnelItems.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(240, funnelItems.length * 38)}>
+              <BarChart
+                data={funnelItems}
+                layout="vertical"
+                margin={{ left: 8, right: 48, top: 4, bottom: 0 }}
               >
-                {d.funil.map((entry) => (
-                  <Cell
-                    key={entry.name}
-                    fill={FUNIL_COLORS[entry.name] ?? "#1A56DB"}
-                    cursor="pointer"
-                    onClick={() => setSelectedStage(entry.name)}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={168}
+                />
+                <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
+                <Bar
+                  dataKey="value"
+                  radius={[0, 4, 4, 0]}
+                  label={{ position: "right", fontSize: 11, fill: "#9BAAB8" }}
+                >
+                  {funnelItems.map((entry) => (
+                    <Cell
+                      key={entry.name}
+                      fill={FUNIL_COLORS[entry.name] ?? "#1A56DB"}
+                      cursor="pointer"
+                      onClick={() => setSelectedStage(entry.name)}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          );
+        })()}
       </div>
+
+      <SectionHeader title="Análise de Perda" />
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <LossReasonsPanel
@@ -372,299 +440,185 @@ export default function AbaBroncoscopia() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Tipo de paciente"
-            tooltip="Compara o volume agendado e realizado por tipo de paciente dentro do filtro atual."
-            comparison={d.comparisons?.charts.comparativo_tipo_paciente}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : comparativoTipoPaciente.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(180, comparativoTipoPaciente.length * 56)}>
-              <BarChart
-                data={comparativoTipoPaciente}
-                layout="vertical"
-                margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={90}
-                />
-                <Tooltip content={<ChartTooltipNum unit="registros" />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="agendadas" name="Agendadas" fill="#DDE3EA" radius={[0, 4, 4, 0]}>
-                  {comparativoTipoPaciente.map((entry) => (
-                    <Cell
-                      key={`agendadas-${entry.name}`}
-                      fill="#DDE3EA"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.tipoPaciente === entry.name &&
-                            record.meta?.agendadaBase
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Broncoscopias agendadas do tipo selecionado",
-                          description:
-                            "Cards que compõem a barra escolhida na série Agendadas de Tipo de paciente.",
-                          contextLabel: `Tipo: ${entry.name}`,
-                          badgeLabel: "Tipo de paciente",
-                          accentColor: "#94A3B8",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-                <Bar dataKey="realizadas" name="Realizadas" radius={[0, 4, 4, 0]}>
-                  {comparativoTipoPaciente.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill={TIPO_COLORS[entry.name] ?? "#9BAAB8"}
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.tipoPaciente === entry.name &&
-                            record.meta?.realizada
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Broncoscopias realizadas do tipo selecionado",
-                          description:
-                            "Cards que compõem a barra escolhida na série Realizadas de Tipo de paciente.",
-                          contextLabel: `Tipo: ${entry.name}`,
-                          badgeLabel: "Tipo de paciente",
-                          accentColor: TIPO_COLORS[entry.name] ?? "#9BAAB8",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+      <SectionHeader title="Distribuição" />
 
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Faturamento por modalidade"
-            tooltip="Soma o valor bruto das broncoscopias realizadas em cada modalidade de pagamento. Quando a modalidade não está preenchida, o registro entra como Não definido."
-            comparison={d.comparisons?.charts.por_modalidade}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.por_modalidade.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(180, d.por_modalidade.length * 44)}>
-              <BarChart
-                data={d.por_modalidade}
-                layout="vertical"
-                margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => fmtBRL(value)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={110}
-                />
-                <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="fat" name="Faturamento" fill="#1A56DB" radius={[0, 4, 4, 0]}>
-                  {d.por_modalidade.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#1A56DB"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.modalidade === entry.name &&
-                            record.meta?.realizada
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Faturamento da modalidade selecionada",
-                          description:
-                            "Broncoscopias realizadas que compõem a barra escolhida em Faturamento por modalidade.",
-                          contextLabel: `Modalidade: ${entry.name}`,
-                          badgeLabel: "Faturamento por modalidade",
-                          accentColor: "#1A56DB",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Broncoscopias por origem"
-            tooltip="Conta quantas broncoscopias agendadas estão ligadas a cada origem de contato. A origem é classificada pelas tags e pela origem do contato, não pelo texto cru do card."
-            comparison={d.comparisons?.charts.por_origem}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.por_origem.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(180, d.por_origem.length * 40)}>
-              <BarChart
-                data={d.por_origem}
-                layout="vertical"
-                margin={{ left: 8, right: 28, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={90}
-                />
-                <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="value" fill="#0891B2" radius={[0, 4, 4, 0]}>
-                  {d.por_origem.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#0891B2"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.origem === entry.name &&
-                            record.meta?.agendadaBase
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Broncoscopias da origem selecionada",
-                          description:
-                            "Cards que compõem a barra escolhida em Broncoscopias por origem.",
-                          contextLabel: `Origem: ${entry.name}`,
-                          badgeLabel: "Broncoscopias por origem",
-                          accentColor: "#0891B2",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Quantidade de códigos"
-            tooltip="Conta quantas broncoscopias agendadas existem em cada quantidade de códigos. Quando esse campo não está preenchido, o registro entra como Não definido."
-            comparison={d.comparisons?.charts.por_codigos}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.por_codigos.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(160, d.por_codigos.length * 44)}>
-              <BarChart
-                data={d.por_codigos}
-                layout="vertical"
-                margin={{ left: 8, right: 48, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={90}
-                />
-                <Tooltip
-                  content={<ChartTooltipNum unit="procedimentos" />}
-                  cursor={{ fill: "#F0F3F6" }}
-                />
-                <Bar
-                  dataKey="value"
-                  fill="#7C3AED"
-                  radius={[0, 4, 4, 0]}
-                  label={{ position: "right", fontSize: 11, fill: "#9BAAB8" }}
+      {/* §13 — Mini-painel comparativo Adulto vs Infantil */}
+      <div className="panel-shell p-4">
+        <PanelTitle
+          title="Tipo de paciente"
+          tooltip="Compara volume, realizações e faturamento entre Adulto e Infantil dentro do filtro atual."
+          comparison={d.comparisons?.charts.comparativo_tipo_paciente}
+        />
+        {d.isLoading ? (
+          <div className="skeleton h-32" />
+        ) : comparativoTipoPaciente.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {comparativoTipoPaciente.map((entry) => {
+              const color = TIPO_COLORS[entry.name] ?? "#9BAAB8";
+              const noShow = Math.max(0, entry.agendadas - entry.realizadas);
+              const noShowPct = entry.agendadas > 0 ? noShow / entry.agendadas : 0;
+              const fat = tipoFaturamento[entry.name] ?? 0;
+              return (
+                <button
+                  key={entry.name}
+                  type="button"
+                  className="panel-shell flex flex-col gap-3 p-4 text-left transition-all hover:shadow-pop"
+                  onClick={() => {
+                    const records = currentRecords.filter(
+                      (r) => r.meta?.tipoPaciente === entry.name
+                    );
+                    if (!records.length) return;
+                    setSheetState({
+                      title: `Broncoscopias — ${entry.name}`,
+                      description: `Todos os cards do tipo ${entry.name} no período atual.`,
+                      contextLabel: `Tipo: ${entry.name}`,
+                      badgeLabel: "Tipo de paciente",
+                      accentColor: color,
+                      records,
+                    });
+                  }}
                 >
-                  {d.por_codigos.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#7C3AED"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.codigos === entry.name &&
-                            record.meta?.agendadaBase
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Broncoscopias da quantidade de códigos selecionada",
-                          description:
-                            "Cards que compõem a barra escolhida em Quantidade de códigos.",
-                          contextLabel: `Códigos: ${entry.name}`,
-                          badgeLabel: "Quantidade de códigos",
-                          accentColor: "#7C3AED",
-                          records,
-                        });
-                      }}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: color }}
                     />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+                    <span className="font-medium text-[#0F1923]">{entry.name}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                    <div>
+                      <p className="text-[#9BAAB8]">Agendadas</p>
+                      <p className="font-semibold text-[#0F1923]">{fmtNum(entry.agendadas)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#9BAAB8]">Realizadas</p>
+                      <p className="font-semibold text-[#0E9F6E]">{fmtNum(entry.realizadas)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#9BAAB8]">No-show</p>
+                      <p className="font-semibold text-[#F59E0B]">
+                        {fmtNum(noShow)}{" "}
+                        <span className="font-normal text-[#9BAAB8]">({fmtPct(noShowPct)})</span>
+                      </p>
+                    </div>
+                    {fat > 0 && (
+                      <div>
+                        <p className="text-[#9BAAB8]">Faturamento</p>
+                        <p className="font-semibold text-[#0F1923]">{fmtBRL(fat)}</p>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Grid 3 colunas (2 em telas médias) */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <DistribuicaoTabsPanel
+          isLoading={d.isLoading}
+          title="Faturamento por modalidade"
+          tooltip="Faturamento bruto das broncoscopias realizadas agrupado por modalidade."
+          tabs={[
+            {
+              key: "modalidade",
+              label: "Modalidade",
+              data: d.por_modalidade.map((e) => ({ name: e.name, value: e.fat })),
+              tooltipType: "brl",
+              color: "#1A56DB",
+              yAxisWidth: 110,
+              onBarClick: (name) => {
+                const records = currentRecords.filter(
+                  (record) =>
+                    record.meta?.modalidade === name && record.meta?.realizada
+                );
+                if (!records.length) return;
+                setSheetState({
+                  title: "Faturamento da modalidade selecionada",
+                  description:
+                    "Broncoscopias realizadas que compõem a barra escolhida em Faturamento por modalidade.",
+                  contextLabel: `Modalidade: ${name}`,
+                  badgeLabel: "Faturamento por modalidade",
+                  accentColor: "#1A56DB",
+                  records,
+                });
+              },
+            },
+          ]}
+        />
+
+        <DistribuicaoTabsPanel
+          isLoading={d.isLoading}
+          title="Broncoscopias por origem"
+          tooltip="Quantidade de broncoscopias agendadas agrupadas por origem de captação do paciente."
+          tabs={[
+            {
+              key: "origem",
+              label: "Origem",
+              data: d.por_origem,
+              tooltipType: "count",
+              unit: "broncoscopias",
+              color: "#7C3AED",
+              yAxisWidth: 120,
+              onBarClick: (name) => {
+                const records = currentRecords.filter(
+                  (record) =>
+                    record.meta?.origem === name && record.meta?.agendadaBase
+                );
+                if (!records.length) return;
+                setSheetState({
+                  title: "Broncoscopias da origem selecionada",
+                  description:
+                    "Cards que compõem a barra escolhida em Broncoscopias por origem.",
+                  contextLabel: `Origem: ${name}`,
+                  badgeLabel: "Broncoscopias por origem",
+                  accentColor: "#7C3AED",
+                  records,
+                });
+              },
+            },
+          ]}
+        />
+
+        <DistribuicaoTabsPanel
+          isLoading={d.isLoading}
+          title="Quantidade de códigos"
+          tooltip="Distribuição de broncoscopias agendadas de acordo com a quantidade de códigos de procedimento utilizados."
+          tabs={[
+            {
+              key: "codigos",
+              label: "Códigos",
+              data: d.por_codigos,
+              tooltipType: "count",
+              unit: "procedimentos",
+              color: "#0891B2",
+              yAxisWidth: 90,
+              onBarClick: (name) => {
+                const records = currentRecords.filter(
+                  (record) =>
+                    record.meta?.codigos === name && record.meta?.agendadaBase
+                );
+                if (!records.length) return;
+                setSheetState({
+                  title: "Broncoscopias da quantidade de códigos selecionada",
+                  description:
+                    "Cards que compõem a barra escolhida em Quantidade de códigos.",
+                  contextLabel: `Códigos: ${name}`,
+                  badgeLabel: "Quantidade de códigos",
+                  accentColor: "#0891B2",
+                  records,
+                });
+              },
+            },
+          ]}
+        />
+      </div>
+
+            <SectionHeader title="Evolução" />
 
       <div className="panel-shell p-4">
         <PanelTitle
@@ -673,7 +627,7 @@ export default function AbaBroncoscopia() {
           comparison={d.comparisons?.charts.evolucao}
         />
         {d.isLoading ? (
-          <div className="h-48 animate-pulse rounded-lg bg-[#F0F3F6]" />
+          <div className="skeleton h-48" />
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart
@@ -736,6 +690,8 @@ export default function AbaBroncoscopia() {
           </ResponsiveContainer>
         )}
       </div>
+
+      {!d.isLoading && d.tabela.length > 0 && <SectionHeader title="Registros" />}
 
       {!d.isLoading && d.tabela.length > 0 && (
         <div className="panel-shell overflow-hidden">

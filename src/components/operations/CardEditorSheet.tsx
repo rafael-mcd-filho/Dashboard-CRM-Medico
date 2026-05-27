@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ExternalLink, Save } from "lucide-react";
+import { Eye, ExternalLink, Pencil, Save } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -36,7 +36,6 @@ type CardEditorSheetMode = "view" | "edit";
 
 type CardEditorSheetProps = {
   card: UnifiedFunnelCard | null;
-  mode: CardEditorSheetMode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (draft: FunnelCardDraft) => Promise<void>;
@@ -104,7 +103,6 @@ function emptyLabel(value: string | null | undefined, fallback = "Não informado
 
 export function CardEditorSheet({
   card,
-  mode,
   open,
   onOpenChange,
   onSave,
@@ -112,9 +110,11 @@ export function CardEditorSheet({
   canEdit,
 }: CardEditorSheetProps) {
   const [draft, setDraft] = useState<FunnelCardDraft | null>(null);
+  const [internalMode, setInternalMode] = useState<CardEditorSheetMode>("view");
 
   useEffect(() => {
     setDraft(card ? createFunnelCardDraft(card) : null);
+    setInternalMode("view");
   }, [card]);
 
   if (!card || !draft) {
@@ -123,7 +123,7 @@ export function CardEditorSheet({
 
   const meta = FUNNEL_CARD_META[card.funnel];
   const Icon = meta.icon;
-  const isEditMode = mode === "edit" && canEdit;
+  const isEditMode = internalMode === "edit" && canEdit;
   const typeValue = getCardTypeValue(card);
   const editableTone = isEditMode ? "editable" : "readonly";
   const isBroncoscopia = draft.funnel === "broncoscopia";
@@ -146,7 +146,7 @@ export function CardEditorSheet({
       >
         <div className="flex min-h-full flex-col">
           <SheetHeader className="border-b border-[#E2E6EB] px-6 py-5 text-left">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 pr-8">
               <span
                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium ${meta.soft}`}
               >
@@ -165,6 +165,30 @@ export function CardEditorSheet({
                   {card.id_do_card || "-"}
                 </span>
               </span>
+              {canEdit && !isEditMode && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto h-8 rounded-xl border-[#D8E6FF] text-clinic-blue hover:bg-[#EEF4FF] hover:text-clinic-blue"
+                  onClick={() => setInternalMode("edit")}
+                >
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Editar
+                </Button>
+              )}
+              {isEditMode && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto h-8 rounded-xl border-[#D8E0E8]"
+                  onClick={() => setInternalMode("view")}
+                >
+                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                  Visualizar
+                </Button>
+              )}
             </div>
 
             <SheetTitle className="mt-3 text-[1.45rem] font-semibold tracking-[-0.04em] text-[#0F1923]">

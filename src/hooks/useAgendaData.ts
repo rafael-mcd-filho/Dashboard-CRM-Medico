@@ -120,6 +120,15 @@ function mapAgendaEvent(
     typeLabel = getAgendaDisplayLabel(row.tipo_paciente);
   }
 
+  /* isRetorno: forma_pagamento = "Retorno sem cobrança"  OU  tipo = "Retorno" */
+  const isRetornoByPayment = isRetornoSemCobranca(row.forma_pagamento);
+  let isRetornoByType = false;
+  if ("tipo_consulta" in row) {
+    isRetornoByType = (row.tipo_consulta ?? "").trim().toLowerCase() === "retorno";
+  } else if ("tipo_paciente" in row) {
+    isRetornoByType = (row.tipo_paciente ?? "").trim().toLowerCase() === "retorno";
+  }
+
   return {
     id: `${funnel}-${row.id}`,
     funnel,
@@ -133,7 +142,7 @@ function mapAgendaEvent(
     stage: getAgendaDisplayLabel(row.etapa_no_crm),
     modality: getAgendaDisplayLabel(row.modalidade_pagamento),
     paymentForm: getAgendaDisplayLabel(row.forma_pagamento),
-    isRetorno: isRetornoSemCobranca(row.forma_pagamento),
+    isRetorno: isRetornoByPayment || isRetornoByType,
     typeLabel,
     amount: getValorFaturavel(row),
     origin,

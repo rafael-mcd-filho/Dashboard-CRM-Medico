@@ -7,7 +7,14 @@
       "Bash(xargs grep -l \"column\\\\|Column\")",
       "mcp__claude_ai_Supabase__apply_migration",
       "mcp__claude_ai_Supabase__list_tables",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(npx tsc *)",
+      "Bash(node -e ' *)",
+      "Bash(node)",
+      "Bash(node scripts/replaceBroncoDistribuicao.cjs)",
+      "Bash(node scripts/replaceCirurgiaDistribuicao.cjs)",
+      "Read(//d/Biblioteca/Documentado/Projetos/Dashboard-CRM-Medico/src/pages/**)",
+      "Bash(npx vite *)"
     ]
   }
 }

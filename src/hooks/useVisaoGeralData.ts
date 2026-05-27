@@ -561,6 +561,7 @@ function buildVisaoGeralMetrics(
     fat_consultas,
     espiro_total,
     espiro_realizadas,
+    espiro_no_show,
     fat_espiro,
     bronco_total,
     bronco_realizadas,

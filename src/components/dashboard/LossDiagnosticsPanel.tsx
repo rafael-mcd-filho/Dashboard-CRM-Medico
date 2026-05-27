@@ -93,10 +93,10 @@ export function LossDiagnosticsPanel({
       {isLoading ? (
         <div className="flex flex-col gap-3">
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="h-28 animate-pulse rounded-[18px] bg-[#F0F3F6]" />
-            <div className="h-28 animate-pulse rounded-[18px] bg-[#F0F3F6]" />
+            <div className="skeleton h-28" />
+            <div className="skeleton h-28" />
           </div>
-          <div className="h-52 animate-pulse rounded-lg bg-[#F0F3F6]" />
+          <div className="skeleton h-52" />
         </div>
       ) : diagnostics.total === 0 ? (
         <div className="flex h-52 items-center justify-center text-center text-sm text-[#9BAAB8]">

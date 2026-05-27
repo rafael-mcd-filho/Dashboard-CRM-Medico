@@ -19,6 +19,8 @@ import {
   YAxis,
 } from "recharts";
 import { CrossFunnelPanel } from "@/components/dashboard/CrossFunnelPanel";
+import { EmptyChart } from "@/components/dashboard/EmptyChart";
+import { DistribuicaoTabsPanel } from "@/components/dashboard/DistribuicaoTabsPanel";
 import { FunnelStageSheet } from "@/components/dashboard/FunnelStageSheet";
 import { HeroMetricCard } from "@/components/dashboard/HeroMetricCard";
 import { LossDiagnosticsPanel } from "@/components/dashboard/LossDiagnosticsPanel";
@@ -103,10 +105,12 @@ function ChartTooltipNum({
   );
 }
 
-function EmptyChart({ label = "Sem dados no período" }: { label?: string }) {
+
+function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="flex h-44 items-center justify-center text-sm text-[#9BAAB8]">
-      {label}
+    <div className="flex items-center gap-3 pt-1">
+      <p className="section-label shrink-0 before:hidden">{title}</p>
+      <div className="flex-1 border-t border-slate-200" aria-hidden="true" />
     </div>
   );
 }
@@ -150,7 +154,9 @@ export default function AbaEspirometria() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <SectionHeader title="Visão" />
+
+      <div className="animate-stagger grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <HeroMetricCard
           label="Agendadas"
           value={fmtNum(d.agendadas)}
@@ -192,6 +198,8 @@ export default function AbaEspirometria() {
           comparison={d.comparisons?.kpis.ticket_medio}
         />
       </div>
+
+      <SectionHeader title="Performance" />
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.9fr)]">
         <PerformancePanel
@@ -253,6 +261,8 @@ export default function AbaEspirometria() {
         />
       </div>
 
+      <SectionHeader title="Cross-funnel" />
+
       <CrossFunnelPanel
         title="Vínculo com consulta"
         tooltip="Mostra quantos contatos da base atual de espirometria também aparecem em consultas dentro do mesmo filtro."
@@ -271,57 +281,64 @@ export default function AbaEspirometria() {
         emptyLabel="Sem espirometrias com contato no período"
       />
 
+      <SectionHeader title="Funil por Etapa" />
+
       <div className="panel-shell p-4">
         <PanelTitle
           title="Funil por etapa"
           tooltip="Mostra quantos cards de espirometria estão em cada etapa do funil dentro do filtro atual. A ordem segue o CRM para facilitar a leitura operacional."
           comparison={d.comparisons?.charts.funil}
         />
-        {d.isLoading ? (
-          <div className="h-52 animate-pulse rounded-lg bg-[#F0F3F6]" />
-        ) : d.funil.length === 0 ? (
-          <EmptyChart />
-        ) : (
-          <ResponsiveContainer width="100%" height={Math.max(220, d.funil.length * 38)}>
-            <BarChart
-              data={d.funil}
-              layout="vertical"
-              margin={{ left: 8, right: 48, top: 4, bottom: 0 }}
-            >
-              <XAxis
-                type="number"
-                tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                axisLine={false}
-                tickLine={false}
-                width={148}
-              />
-              <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
-              <Bar
-                dataKey="value"
-                radius={[0, 4, 4, 0]}
-                label={{ position: "right", fontSize: 11, fill: "#9BAAB8" }}
+        {(() => {
+          const funnelItems = d.funil.filter((e) => e.value > 0);
+          return d.isLoading ? (
+            <div className="skeleton h-52" />
+          ) : funnelItems.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(220, funnelItems.length * 38)}>
+              <BarChart
+                data={funnelItems}
+                layout="vertical"
+                margin={{ left: 8, right: 48, top: 4, bottom: 0 }}
               >
-                {d.funil.map((entry) => (
-                  <Cell
-                    key={entry.name}
-                    fill={FUNIL_COLORS[entry.name] ?? "#1A56DB"}
-                    cursor="pointer"
-                    onClick={() => setSelectedStage(entry.name)}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={148}
+                />
+                <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
+                <Bar
+                  dataKey="value"
+                  radius={[0, 4, 4, 0]}
+                  label={{ position: "right", fontSize: 11, fill: "#9BAAB8" }}
+                >
+                  {funnelItems.map((entry) => (
+                    <Cell
+                      key={entry.name}
+                      fill={FUNIL_COLORS[entry.name] ?? "#1A56DB"}
+                      cursor="pointer"
+                      onClick={() => setSelectedStage(entry.name)}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          );
+        })()}
       </div>
+
+      <SectionHeader title="Análise de Perda" />
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <LossReasonsPanel
@@ -339,199 +356,110 @@ export default function AbaEspirometria() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Faturamento por modalidade"
-            tooltip="Soma o valor bruto das espirometrias realizadas em cada modalidade de pagamento. Quando a modalidade não está preenchida, o registro entra como Não definido."
-            comparison={d.comparisons?.charts.por_modalidade}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.por_modalidade.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(200, d.por_modalidade.length * 44)}>
-              <BarChart
-                data={d.por_modalidade}
-                layout="vertical"
-                margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => fmtBRL(value)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={110}
-                />
-                <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="fat" name="Faturamento" fill="#1A56DB" radius={[0, 4, 4, 0]}>
-                  {d.por_modalidade.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#1A56DB"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.modalidade === entry.name &&
-                            record.meta?.realizada
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Faturamento da modalidade selecionada",
-                          description:
-                            "Espirometrias realizadas que compõem a barra escolhida em Faturamento por modalidade.",
-                          contextLabel: `Modalidade: ${entry.name}`,
-                          badgeLabel: "Faturamento por modalidade",
-                          accentColor: "#1A56DB",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+      <SectionHeader title="Distribuição" />
 
-        <div className="panel-shell p-4">
-          <PanelTitle
-            title="Espirometrias por origem"
-            tooltip="Conta quantas espirometrias agendadas estão ligadas a cada origem de contato. A origem é classificada pelas tags e pela origem do contato, não pelo texto cru do card."
-            comparison={d.comparisons?.charts.por_origem}
-          />
-          {d.isLoading ? (
-            <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-          ) : d.por_origem.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(200, d.por_origem.length * 40)}>
-              <BarChart
-                data={d.por_origem}
-                layout="vertical"
-                margin={{ left: 8, right: 28, top: 4, bottom: 0 }}
-              >
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={90}
-                />
-                <Tooltip content={<ChartTooltipNum />} cursor={{ fill: "#F0F3F6" }} />
-                <Bar dataKey="value" fill="#0891B2" radius={[0, 4, 4, 0]}>
-                  {d.por_origem.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill="#0891B2"
-                      cursor="pointer"
-                      onClick={() => {
-                        const records = currentRecords.filter(
-                          (record) =>
-                            record.meta?.origem === entry.name &&
-                            record.meta?.agendadaBase
-                        );
-                        if (!records.length) return;
-                        setSheetState({
-                          title: "Espirometrias da origem selecionada",
-                          description:
-                            "Cards que compõem a barra escolhida em Espirometrias por origem.",
-                          contextLabel: `Origem: ${entry.name}`,
-                          badgeLabel: "Espirometrias por origem",
-                          accentColor: "#0891B2",
-                          records,
-                        });
-                      }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      <div className="panel-shell p-4">
-        <PanelTitle
-          title="Faturamento por origem"
-          tooltip="Soma o faturamento bruto das espirometrias realizadas em cada origem de contato, usando a mesma classificação de origem aplicada no restante do dashboard."
-          comparison={d.comparisons?.charts.faturamento_por_origem}
+      {/* Grid 2 colunas — Modalidade + Por origem */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <DistribuicaoTabsPanel
+          isLoading={d.isLoading}
+          title="Faturamento por modalidade"
+          tooltip="Faturamento bruto das espirometrias realizadas agrupado por modalidade."
+          tabs={[
+            {
+              key: "modalidade",
+              label: "Modalidade",
+              data: d.por_modalidade.map((e) => ({ name: e.name, value: e.fat })),
+              tooltipType: "brl",
+              color: "#1A56DB",
+              yAxisWidth: 110,
+              onBarClick: (name) => {
+                const records = currentRecords.filter(
+                  (record) =>
+                    record.meta?.modalidade === name && record.meta?.realizada
+                );
+                if (!records.length) return;
+                setSheetState({
+                  title: "Faturamento da modalidade selecionada",
+                  description:
+                    "Espirometrias realizadas que compõem a barra escolhida em Faturamento por modalidade.",
+                  contextLabel: `Modalidade: ${name}`,
+                  badgeLabel: "Faturamento por modalidade",
+                  accentColor: "#1A56DB",
+                  records,
+                });
+              },
+            },
+          ]}
         />
-        {d.isLoading ? (
-          <div className="h-44 animate-pulse rounded-lg bg-[#F0F3F6]" />
-        ) : d.faturamento_por_origem.length === 0 ? (
-          <EmptyChart />
-        ) : (
-          <ResponsiveContainer width="100%" height={Math.max(200, d.faturamento_por_origem.length * 40)}>
-            <BarChart
-              data={d.faturamento_por_origem}
-              layout="vertical"
-              margin={{ left: 8, right: 16, top: 4, bottom: 0 }}
-            >
-              <XAxis
-                type="number"
-                tick={{ fontSize: 11, fill: "#9BAAB8" }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => fmtBRL(value)}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: 12, fill: "#5C6B7A" }}
-                axisLine={false}
-                tickLine={false}
-                width={110}
-              />
-              <Tooltip content={<ChartTooltipBRL />} cursor={{ fill: "#F0F3F6" }} />
-              <Bar dataKey="value" name="Faturamento" fill="#0891B2" radius={[0, 4, 4, 0]}>
-                {d.faturamento_por_origem.map((entry) => (
-                  <Cell
-                    key={entry.name}
-                    fill="#0891B2"
-                    cursor="pointer"
-                    onClick={() => {
-                      const records = currentRecords.filter(
-                        (record) =>
-                          record.meta?.origem === entry.name &&
-                          record.meta?.realizada
-                      );
-                      if (!records.length) return;
-                      setSheetState({
-                        title: "Faturamento da origem selecionada",
-                        description:
-                          "Espirometrias realizadas que compõem a barra escolhida em Faturamento por origem.",
-                        contextLabel: `Origem: ${entry.name}`,
-                        badgeLabel: "Faturamento por origem",
-                        accentColor: "#0891B2",
-                        records,
-                      });
-                    }}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
+
+        <DistribuicaoTabsPanel
+          isLoading={d.isLoading}
+          title="Espirometrias por origem"
+          tooltip="Quantidade de espirometrias agendadas agrupadas por origem de captação do paciente."
+          tabs={[
+            {
+              key: "origem",
+              label: "Origem",
+              data: d.por_origem,
+              tooltipType: "count",
+              unit: "espirometrias",
+              color: "#0891B2",
+              yAxisWidth: 120,
+              onBarClick: (name) => {
+                const records = currentRecords.filter(
+                  (record) =>
+                    record.meta?.origem === name && record.meta?.agendadaBase
+                );
+                if (!records.length) return;
+                setSheetState({
+                  title: "Espirometrias da origem selecionada",
+                  description:
+                    "Cards que compõem a barra escolhida em Espirometrias por origem.",
+                  contextLabel: `Origem: ${name}`,
+                  badgeLabel: "Espirometrias por origem",
+                  accentColor: "#0891B2",
+                  records,
+                });
+              },
+            },
+          ]}
+        />
       </div>
+
+      {/* Faturamento por origem — largura total */}
+      <DistribuicaoTabsPanel
+        isLoading={d.isLoading}
+        title="Faturamento por origem"
+        tooltip="Faturamento bruto das espirometrias realizadas agrupado por origem de captação do paciente."
+        tabs={[
+          {
+            key: "fat_origem",
+            label: "Fat. Origem",
+            data: d.faturamento_por_origem,
+            tooltipType: "brl",
+            color: "#0891B2",
+            yAxisWidth: 110,
+            onBarClick: (name) => {
+              const records = currentRecords.filter(
+                (record) =>
+                  record.meta?.origem === name && record.meta?.realizada
+              );
+              if (!records.length) return;
+              setSheetState({
+                title: "Faturamento da origem selecionada",
+                description:
+                  "Espirometrias realizadas que compõem a barra escolhida em Faturamento por origem.",
+                contextLabel: `Origem: ${name}`,
+                badgeLabel: "Faturamento por origem",
+                accentColor: "#0891B2",
+                records,
+              });
+            },
+          },
+        ]}
+      />
+
+            <SectionHeader title="Evolução" />
 
       <div className="panel-shell p-4">
         <PanelTitle
@@ -540,7 +468,7 @@ export default function AbaEspirometria() {
           comparison={d.comparisons?.charts.evolucao}
         />
         {d.isLoading ? (
-          <div className="h-48 animate-pulse rounded-lg bg-[#F0F3F6]" />
+          <div className="skeleton h-48" />
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart
@@ -603,6 +531,8 @@ export default function AbaEspirometria() {
           </ResponsiveContainer>
         )}
       </div>
+
+      {!d.isLoading && d.tabela.length > 0 && <SectionHeader title="Registros" />}
 
       {!d.isLoading && d.tabela.length > 0 && (
         <div className="panel-shell overflow-hidden">

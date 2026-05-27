@@ -116,7 +116,7 @@ export function PresenceConversionPanel({
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="h-[188px] animate-pulse rounded-[20px] bg-[#F0F3F6]"
+              className="skeleton h-[188px]"
             />
           ))}
         </div>
