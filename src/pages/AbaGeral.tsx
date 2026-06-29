@@ -2,7 +2,9 @@ import { useState, useCallback } from "react";
 import {
   AlertTriangle,
   ArrowRightLeft,
+  Check,
   Clock3,
+  FileJson,
   LayoutDashboard,
   Target,
   Users,
@@ -29,6 +31,8 @@ import { LossReasonsPanel } from "@/components/dashboard/LossReasonsPanel";
 import { PanelTitle } from "@/components/dashboard/PanelTitle";
 import { PresenceConversionPanel } from "@/components/dashboard/PresenceConversionPanel";
 import { RecordsDrilldownSheet } from "@/components/dashboard/RecordsDrilldownSheet";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import { useFilters } from "@/contexts/FiltersContext";
 import { useVisaoGeralData } from "@/hooks/useVisaoGeralData";
 import { getDateModeLabel } from "@/lib/dateMode";
@@ -45,6 +49,36 @@ function SectionHeader({ title }: { title: string }) {
       <div className="flex-1 border-t border-slate-200" aria-hidden="true" />
     </div>
   );
+}
+
+function fallbackCopyText(text: string) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error("copy_failed");
+  }
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall back to the legacy copy path below.
+    }
+  }
+
+  fallbackCopyText(text);
 }
 
 const FUNIL_LINE_COLORS = {
@@ -135,6 +169,23 @@ export default function AbaGeral() {
     accentColor: string;
     records: FunnelStageDrilldownRecord[];
   } | null>(null);
+  const [jsonCopied, setJsonCopied] = useState(false);
+
+  const handleCopyMetricsJson = useCallback(async () => {
+    const payload = {
+      ...d.exportacao_metricas,
+      gerado_em: new Date().toISOString(),
+    };
+
+    try {
+      await copyTextToClipboard(JSON.stringify(payload, null, 2));
+      setJsonCopied(true);
+      toast.success("JSON copiado");
+      window.setTimeout(() => setJsonCopied(false), 2200);
+    } catch {
+      toast.error("Nao foi possivel copiar o JSON");
+    }
+  }, [d.exportacao_metricas]);
 
   /* Interactive legend for "Evolução por funil" */
   const [hiddenFunis, setHiddenFunis] = useState<Set<FunilKey>>(new Set());
@@ -870,6 +921,23 @@ export default function AbaGeral() {
           </div>
         </div>
       )}
+
+      <div className="flex justify-end border-t border-slate-100 pt-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleCopyMetricsJson}
+          disabled={d.isLoading}
+        >
+          {jsonCopied ? (
+            <Check data-icon="inline-start" aria-hidden="true" />
+          ) : (
+            <FileJson data-icon="inline-start" aria-hidden="true" />
+          )}
+          {jsonCopied ? "JSON copiado" : "Gerar JSON"}
+        </Button>
+      </div>
 
       <RecordsDrilldownSheet
         open={Boolean(sheetState)}
