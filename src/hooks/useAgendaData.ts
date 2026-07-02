@@ -6,6 +6,7 @@ import {
   isContatoOrigemAnuncio,
 } from "@/lib/contactOrigins";
 import {
+  AGENDA_FUNNEL_META,
   getAgendaDisplayLabel,
   getAgendaTurn,
   isAgendaStageVisible,
@@ -98,6 +99,7 @@ function mapAgendaEvent(
   contatoMap: Map<string, ContatoOrigemRow>
 ): AgendaEvent | null {
   const dateValue = parseAgendaDate(row.data_agendamento);
+  const funnelMeta = AGENDA_FUNNEL_META[funnel];
 
   if (!dateValue || !row.data_agendamento || !isAgendaStageVisible(row.etapa_no_crm)) {
     return null;
@@ -137,12 +139,14 @@ function mapAgendaEvent(
     dateValue,
     timeLabel,
     timeMinutes,
+    durationMinutes: funnelMeta.durationMinutes,
     turn: getAgendaTurn(timeLabel),
     responsible: getAgendaDisplayLabel(row.responsavel),
     stage: getAgendaDisplayLabel(row.etapa_no_crm),
     modality: getAgendaDisplayLabel(row.modalidade_pagamento),
     paymentForm: getAgendaDisplayLabel(row.forma_pagamento),
     isRetorno: isRetornoByPayment || isRetornoByType,
+    serviceLabel: funnelMeta.serviceLabel,
     typeLabel,
     amount: getValorFaturavel(row),
     origin,
