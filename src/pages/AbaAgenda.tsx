@@ -5,7 +5,6 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   ExternalLink,
   Megaphone,
   Search,
@@ -51,6 +50,10 @@ import {
   AGENDA_FUNNEL_META,
   AGENDA_FUNNEL_ORDER,
   AGENDA_TURN_META,
+  formatAgendaDuration,
+  formatAgendaMinutes,
+  getAgendaEventEndMinutes,
+  getAgendaEventTimeRange,
   getAgendaRange,
   getAgendaRangeLabel,
   getMonthGridDays,
@@ -133,6 +136,7 @@ function AgendaEventCard({
 }) {
   const funnelMeta  = AGENDA_FUNNEL_META[event.funnel];
   const isMissingTime = !event.timeLabel;
+  const timeRange = getAgendaEventTimeRange(event);
 
   /* Eventos já passados ficam mais suaves */
   const isPast = event.dateValue < new Date() && !isToday(event.dateValue);
@@ -141,11 +145,14 @@ function AgendaEventCard({
     <button
       type="button"
       onClick={() => onOpen(event)}
+      style={{
+        background: `linear-gradient(180deg, ${funnelMeta.surface} 0%, #FFFFFF 140%)`,
+        borderColor: isMissingTime ? "#F6C27B" : funnelMeta.border,
+      }}
       className={cn(
-        "group relative w-full overflow-hidden rounded-[var(--radius-md)] border border-[#E2E6EB] bg-white text-left",
+        "group relative w-full overflow-hidden rounded-[var(--radius-md)] border text-left",
         "shadow-[var(--shadow-card)] transition-[transform,box-shadow,border-color] duration-150",
         "hover:-translate-y-px hover:shadow-[var(--shadow-pop)]",
-        isMissingTime && "border-[#F6C27B] bg-[#FFF9F1]",
         isPast && "opacity-55",
         compact ? "p-2" : "p-2.5"
       )}
@@ -171,7 +178,7 @@ function AgendaEventCard({
               <AlertTriangle className="h-3 w-3 text-clinic-amber" aria-label="Sem horário definido" />
             ) : (
               <span className="font-mono text-[10px] font-medium text-[#9BAAB8]">
-                {event.timeLabel}
+                {timeRange}
               </span>
             )}
             {event.isAds && (
@@ -186,7 +193,7 @@ function AgendaEventCard({
           <span
             className={cn("rounded-full border px-1.5 py-0.5 text-[10px] font-medium", funnelMeta.soft)}
           >
-            {compact ? funnelMeta.shortLabel : funnelMeta.label}
+            {compact ? funnelMeta.shortLabel : event.serviceLabel}
           </span>
 
           {/* Responsável */}
@@ -309,6 +316,7 @@ function AgendaDetailSheet({
   if (!event) return null;
 
   const funnelMeta = AGENDA_FUNNEL_META[event.funnel];
+  const timeRange = getAgendaEventTimeRange(event);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -344,7 +352,7 @@ function AgendaDetailSheet({
             </SheetTitle>
             <SheetDescription className="text-sm text-[#5C6B7A]">
               {format(event.dateValue, "EEEE, dd 'de' MMMM", { locale: ptBR })}{" "}
-              {event.timeLabel ? `às ${event.timeLabel}` : "sem horário definido"}
+              {timeRange ? `das ${timeRange}` : "sem horário definido"}
             </SheetDescription>
           </SheetHeader>
 
@@ -356,6 +364,8 @@ function AgendaDetailSheet({
                 ["Modalidade", event.modality],
                 ["Forma", event.paymentForm],
                 ["Origem", event.origin],
+                ["Procedimento", event.serviceLabel],
+                ["Duração", formatAgendaDuration(event.durationMinutes)],
                 ["Tipo", event.typeLabel ?? "Não definido"],
                 ["Valor", event.amount > 0 ? fmtBRL(event.amount) : "—"],
               ].map(([label, value]) => (
@@ -514,7 +524,205 @@ function DayAgendaView({
 }
 
 const TIMELINE_START_H = 6;
-const TIMELINE_END_H = 22;
+const TIMELINE_END_H = 19;
+const TIMELINE_PX_PER_MINUTE = 2.4;
+const TIMELINE_MIN_EVENT_HEIGHT = 46;
+const WEEK_DAY_MIN_WIDTH = 260;
+
+type TimelineEventLayout = {
+  event: AgendaEvent;
+  top: number;
+  height: number;
+  leftPercent: number;
+  widthPercent: number;
+  hasOverlap: boolean;
+};
+
+function getTimelineBounds(timedEvents: AgendaEvent[]) {
+  const defaultStart = TIMELINE_START_H * 60;
+  const defaultEnd = TIMELINE_END_H * 60;
+
+  if (timedEvents.length === 0) {
+    return { start: defaultStart, end: defaultEnd };
+  }
+
+  const minStart = Math.min(...timedEvents.map((event) => event.timeMinutes ?? defaultStart));
+  const maxEnd = Math.max(
+    ...timedEvents.map((event) => getAgendaEventEndMinutes(event) ?? defaultEnd)
+  );
+
+  return {
+    start: Math.max(0, Math.min(defaultStart, Math.floor(minStart / 60) * 60)),
+    end: Math.min(24 * 60, Math.max(defaultEnd, Math.ceil(maxEnd / 60) * 60)),
+  };
+}
+
+function buildTimelineEventLayouts(
+  events: AgendaEvent[],
+  timelineStartMinutes: number
+): TimelineEventLayout[] {
+  const timedEvents = events
+    .filter((event) => event.timeMinutes !== null)
+    .sort((a, b) => {
+      const timeDiff = (a.timeMinutes ?? 0) - (b.timeMinutes ?? 0);
+      if (timeDiff !== 0) return timeDiff;
+      return b.durationMinutes - a.durationMinutes;
+    });
+
+  const layouts: TimelineEventLayout[] = [];
+  let cluster: AgendaEvent[] = [];
+  let clusterEnd = -1;
+
+  const flushCluster = () => {
+    if (cluster.length === 0) return;
+
+    const columnEnds: number[] = [];
+    const placements: Array<{ event: AgendaEvent; columnIndex: number }> = [];
+
+    cluster.forEach((event) => {
+      const start = event.timeMinutes ?? 0;
+      const end = getAgendaEventEndMinutes(event) ?? start + event.durationMinutes;
+      let columnIndex = columnEnds.findIndex((columnEnd) => columnEnd <= start);
+
+      if (columnIndex === -1) {
+        columnIndex = columnEnds.length;
+        columnEnds.push(end);
+      } else {
+        columnEnds[columnIndex] = end;
+      }
+
+      placements.push({ event, columnIndex });
+    });
+
+    const columnCount = Math.max(columnEnds.length, 1);
+
+    placements.forEach(({ event, columnIndex }) => {
+      const start = event.timeMinutes ?? timelineStartMinutes;
+      layouts.push({
+        event,
+        top: (start - timelineStartMinutes) * TIMELINE_PX_PER_MINUTE,
+        height: Math.max(
+          event.durationMinutes * TIMELINE_PX_PER_MINUTE,
+          TIMELINE_MIN_EVENT_HEIGHT
+        ),
+        leftPercent: (columnIndex / columnCount) * 100,
+        widthPercent: 100 / columnCount,
+        hasOverlap: columnCount > 1,
+      });
+    });
+
+    cluster = [];
+    clusterEnd = -1;
+  };
+
+  timedEvents.forEach((event) => {
+    const start = event.timeMinutes ?? 0;
+    const end = getAgendaEventEndMinutes(event) ?? start + event.durationMinutes;
+
+    if (cluster.length === 0 || start < clusterEnd) {
+      cluster.push(event);
+      clusterEnd = Math.max(clusterEnd, end);
+      return;
+    }
+
+    flushCluster();
+    cluster.push(event);
+    clusterEnd = end;
+  });
+
+  flushCluster();
+
+  return layouts;
+}
+
+function AgendaTimelineEventCard({
+  event,
+  onOpen,
+  density = "day",
+}: {
+  event: AgendaEvent;
+  onOpen: (event: AgendaEvent) => void;
+  density?: "day" | "week";
+}) {
+  const funnelMeta = AGENDA_FUNNEL_META[event.funnel];
+  const timeRange = getAgendaEventTimeRange(event);
+  const isShort = event.durationMinutes <= 15;
+  const isWeek = density === "week";
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(event)}
+      style={{
+        background: `linear-gradient(135deg, ${funnelMeta.surface} 0%, #FFFFFF 135%)`,
+        borderColor: funnelMeta.border,
+        color: funnelMeta.text,
+      }}
+      className={cn(
+        "group relative flex h-full w-full overflow-hidden rounded-[var(--radius-md)] border text-left shadow-[var(--shadow-card)] transition-[transform,box-shadow]",
+        "hover:-translate-y-px hover:shadow-[var(--shadow-pop)]",
+        isWeek ? "px-2 py-1.5" : "px-3 py-2"
+      )}
+    >
+      <span
+        className="absolute inset-y-0 left-0 w-[4px]"
+        style={{ backgroundColor: funnelMeta.color }}
+        aria-hidden="true"
+      />
+
+      {isWeek ? (
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 pl-2">
+          <span className="truncate font-mono text-[9px] font-semibold leading-none">
+            {timeRange}
+          </span>
+          <p className="min-w-0 truncate text-[11px] font-semibold leading-tight text-[#0F1923]">
+            {event.patientName}
+          </p>
+          {!isShort ? (
+            <p className="truncate text-[10px] font-medium leading-tight">
+              {event.serviceLabel}
+            </p>
+          ) : null}
+          {event.isRetorno && !isShort ? (
+            <span className="w-fit rounded-full bg-white/70 px-1.5 py-0.5 text-[9px] font-medium text-clinic-blue">
+              {RETORNO_AGENDA_TAG}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <div className={cn("flex min-w-0 flex-1 flex-col pl-2", isShort ? "justify-center gap-0.5" : "justify-between gap-1")}>
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <p className="min-w-0 truncate text-[12px] font-semibold leading-snug text-[#0F1923]">
+              {event.patientName}
+            </p>
+            <span className="shrink-0 font-mono text-[10px] font-semibold">
+              {timeRange}
+            </span>
+          </div>
+
+          <div className={cn("flex min-w-0 items-center gap-1.5", isShort ? "text-[10px]" : "text-[11px]")}>
+            <span className="truncate font-medium">{event.serviceLabel}</span>
+            {event.isAds ? (
+              <Megaphone className="ml-auto h-3 w-3 shrink-0 text-clinic-amber" aria-label="Contato de anúncio" />
+            ) : null}
+          </div>
+
+          {!isShort && (
+            <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-[#7C8B99]">
+              <UserRound className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{event.responsible}</span>
+              {event.isRetorno ? (
+                <span className="ml-auto rounded-full bg-white/70 px-1.5 py-0.5 text-[9px] font-medium text-clinic-blue">
+                  {RETORNO_AGENDA_TAG}
+                </span>
+              ) : null}
+            </div>
+          )}
+        </div>
+      )}
+    </button>
+  );
+}
 
 function DayTimelineView({
   events,
@@ -529,92 +737,117 @@ function DayTimelineView({
   const now = new Date();
   const isViewingToday = isToday(anchorDate);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-  const hours = Array.from(
-    { length: TIMELINE_END_H - TIMELINE_START_H },
-    (_, i) => {
-      const hour = TIMELINE_START_H + i;
-      const slotEvents = dayEvents.filter((e) => {
-        if (e.timeMinutes === null) return false;
-        return Math.floor(e.timeMinutes / 60) === hour;
-      });
-      return { hour, slotEvents };
-    }
-  );
-
+  const timedEvents = dayEvents.filter((e) => e.timeMinutes !== null);
   const untimedEvents = dayEvents.filter((e) => e.timeMinutes === null);
+  const timelineBounds = getTimelineBounds(timedEvents);
+  const timelineHeight =
+    (timelineBounds.end - timelineBounds.start) * TIMELINE_PX_PER_MINUTE;
+  const timelineLayouts = buildTimelineEventLayouts(timedEvents, timelineBounds.start);
+  const hourMarks = Array.from(
+    { length: (timelineBounds.end - timelineBounds.start) / 60 + 1 },
+    (_, index) => timelineBounds.start + index * 60
+  );
+  const currentTop =
+    isViewingToday &&
+    nowMinutes >= timelineBounds.start &&
+    nowMinutes <= timelineBounds.end
+      ? (nowMinutes - timelineBounds.start) * TIMELINE_PX_PER_MINUTE
+      : null;
 
   return (
     <div className="space-y-3">
       <div className="panel-shell overflow-hidden">
-        <div className="divide-y divide-slate-100">
-          {hours.map(({ hour, slotEvents }) => {
-            const slotStart = hour * 60;
-            const slotEnd = slotStart + 60;
-            const isCurrentHour =
-              isViewingToday && nowMinutes >= slotStart && nowMinutes < slotEnd;
-            const isPast = isViewingToday && nowMinutes >= slotEnd;
-            const nowFrac = isCurrentHour
-              ? (nowMinutes - slotStart) / 60
-              : null;
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E6EB] px-4 py-3">
+          <div>
+            <h3 className="text-[13px] font-semibold text-[#0F1923]">
+              Ocupação do dia
+            </h3>
+            <p className="mt-0.5 text-[11px] text-[#9BAAB8]">
+              Blocos proporcionais à duração configurada de cada procedimento.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-full bg-[#F3F5F7] px-2 py-0.5 text-[10px] font-medium text-[#5C6B7A]">
+              {fmtNum(timedEvents.length)} com horário
+            </span>
+            {untimedEvents.length > 0 ? (
+              <span className="rounded-full bg-[#FFF4E8] px-2 py-0.5 text-[10px] font-medium text-clinic-amber">
+                {fmtNum(untimedEvents.length)} sem horário
+              </span>
+            ) : null}
+          </div>
+        </div>
 
-            return (
-              <div
-                key={hour}
-                className={cn(
-                  "relative flex min-h-[56px] gap-0",
-                  isPast && "bg-slate-50/40",
-                  isCurrentHour && "bg-[#F0FDF4]"
-                )}
-              >
-                {/* Hour label */}
-                <div className="flex w-14 shrink-0 justify-end pt-2 pr-3">
-                  <span
-                    className={cn(
-                      "font-mono text-[10px] font-medium",
-                      isCurrentHour
-                        ? "text-clinic-green"
-                        : isPast
-                          ? "text-slate-300"
-                          : "text-slate-400"
-                    )}
-                  >
-                    {String(hour).padStart(2, "0")}:00
-                  </span>
-                </div>
+        <div className="overflow-x-auto">
+          <div
+            className="relative min-w-[760px] bg-white"
+            style={{ height: timelineHeight }}
+          >
+            {hourMarks.map((minutes) => {
+              const top = (minutes - timelineBounds.start) * TIMELINE_PX_PER_MINUTE;
+              const isPastHour = isViewingToday && nowMinutes > minutes + 60;
 
-                {/* Content column */}
-                <div className="relative flex-1 border-l border-slate-100 py-1.5 pr-3 pl-2">
-                  {/* "Agora" marker */}
-                  {isCurrentHour && nowFrac !== null && (
-                    <div
-                      className="pointer-events-none absolute left-0 right-0 z-10 flex items-center"
-                      style={{ top: `${nowFrac * 100}%` }}
-                      aria-hidden="true"
+              return (
+                <div
+                  key={minutes}
+                  className="absolute left-0 right-0 flex items-start"
+                  style={{ top }}
+                  aria-hidden="true"
+                >
+                  <div className="w-14 shrink-0 pr-3 text-right">
+                    <span
+                      className={cn(
+                        "font-mono text-[10px] font-medium",
+                        isPastHour ? "text-[#CAD3DC]" : "text-[#7C8B99]"
+                      )}
                     >
-                      <span className="ml-[-5px] h-2.5 w-2.5 shrink-0 rounded-full bg-clinic-green ring-2 ring-white animate-[pulseScale_2s_ease-in-out_infinite]" />
-                      <div className="flex-1 border-t-2 border-clinic-green/60" />
-                    </div>
-                  )}
-
-                  {slotEvents.length === 0 ? (
-                    <div className="min-h-[40px]" />
-                  ) : (
-                    <div className="space-y-1.5">
-                      {slotEvents.map((event) => (
-                        <AgendaEventCard
-                          key={event.id}
-                          event={event}
-                          compact
-                          onOpen={onOpen}
-                        />
-                      ))}
-                    </div>
-                  )}
+                      {formatAgendaMinutes(minutes)}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-px flex-1 bg-[#EEF1F4]" />
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+
+            <div className="absolute inset-y-0 left-16 right-3 border-l border-[#DDE3EA]">
+              {timelineLayouts.length === 0 ? (
+                <div className="absolute inset-x-4 top-10 flex min-h-28 items-center justify-center rounded-[18px] border border-dashed border-[#DDE3EA] bg-[#FAFBFC] px-4 text-center text-[12px] text-[#9BAAB8]">
+                  Sem agendamentos com horário neste dia
+                </div>
+              ) : (
+                timelineLayouts.map((layout) => (
+                  <div
+                    key={layout.event.id}
+                    className="absolute px-1"
+                    style={{
+                      top: layout.top,
+                      height: layout.height,
+                      left: `${layout.leftPercent}%`,
+                      width: layout.hasOverlap
+                        ? `calc(${layout.widthPercent}% - 4px)`
+                        : `${layout.widthPercent}%`,
+                    }}
+                  >
+                    <AgendaTimelineEventCard
+                      event={layout.event}
+                      onOpen={onOpen}
+                    />
+                  </div>
+                ))
+              )}
+
+              {currentTop !== null ? (
+                <div
+                  className="pointer-events-none absolute left-0 right-0 z-20 flex items-center"
+                  style={{ top: currentTop }}
+                  aria-hidden="true"
+                >
+                  <span className="ml-[-5px] h-2.5 w-2.5 shrink-0 rounded-full bg-clinic-green ring-2 ring-white animate-[pulseScale_2s_ease-in-out_infinite]" />
+                  <div className="flex-1 border-t-2 border-clinic-green/60" />
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -643,83 +876,161 @@ function WeekAgendaView({
   onOpenDay: (date: Date) => void;
 }) {
   const weekDays = getWeekDays(anchorDate);
+  const timedEvents = events.filter((event) => event.timeMinutes !== null);
+  const untimedEvents = events.filter((event) => event.timeMinutes === null);
+  const timelineBounds = getTimelineBounds(timedEvents);
+  const timelineHeight =
+    (timelineBounds.end - timelineBounds.start) * TIMELINE_PX_PER_MINUTE;
+  const hourMarks = Array.from(
+    { length: (timelineBounds.end - timelineBounds.start) / 60 + 1 },
+    (_, index) => timelineBounds.start + index * 60
+  );
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const weekGridColumns = `56px repeat(7, minmax(${WEEK_DAY_MIN_WIDTH}px, 1fr))`;
+  const weekMinWidth = 56 + WEEK_DAY_MIN_WIDTH * 7;
+  const currentTop =
+    nowMinutes >= timelineBounds.start && nowMinutes <= timelineBounds.end
+      ? (nowMinutes - timelineBounds.start) * TIMELINE_PX_PER_MINUTE
+      : null;
 
   return (
-    <div className="overflow-x-auto">
-      <div className="grid min-w-[1120px] grid-cols-7 gap-3">
-        {weekDays.map((day) => {
-          const dayEvents = events.filter((event) => isSameDay(event.dateValue, day));
-          const grouped = groupByTurn(dayEvents);
+    <div className="flex flex-col gap-3">
+      <div className="overflow-x-auto">
+        <div className="panel-shell overflow-hidden" style={{ minWidth: weekMinWidth }}>
+          <div
+            className="grid border-b border-[#E2E6EB] bg-white"
+            style={{ gridTemplateColumns: weekGridColumns }}
+          >
+            <div className="border-r border-[#E2E6EB] bg-[#FAFBFC]" />
+            {weekDays.map((day) => {
+              const dayEvents = events.filter((event) => isSameDay(event.dateValue, day));
+              const dayTimedEvents = dayEvents.filter((event) => event.timeMinutes !== null);
 
-          return (
-            <div key={day.toISOString()} className="panel-shell p-3">
-              <button
-                type="button"
-                onClick={() => onOpenDay(day)}
-                className="mb-3 w-full rounded-[16px] border border-[#E2E6EB] bg-[#FAFBFC] px-3 py-2 text-left transition-colors hover:bg-[#F3F6FB]"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9BAAB8]">
-                  {format(day, "EEE", { locale: ptBR })}
-                </p>
-                <div className="mt-1 flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-[#0F1923]">
-                    {format(day, "dd 'de' MMM", { locale: ptBR })}
+              return (
+                <button
+                  key={day.toISOString()}
+                  type="button"
+                  onClick={() => onOpenDay(day)}
+                  className={cn(
+                    "border-r border-[#E2E6EB] px-3 py-3 text-left transition-colors last:border-r-0 hover:bg-[#F7F9FB]",
+                    isToday(day) && "bg-[#EEF4FF]"
+                  )}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9BAAB8]">
+                    {format(day, "EEE", { locale: ptBR })}
                   </p>
-                  <span className="rounded-full bg-[#EEF3FF] px-2 py-0.5 text-[10px] font-medium text-clinic-blue">
-                    {fmtNum(dayEvents.length)}
-                  </span>
-                </div>
-              </button>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-semibold text-[#0F1923]">
+                      {format(day, "dd 'de' MMM", { locale: ptBR })}
+                    </p>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-clinic-blue shadow-[inset_0_0_0_1px_#D7E6FF]">
+                      {fmtNum(dayTimedEvents.length)}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
 
-              {dayEvents.length === 0 ? (
-                <div className="flex min-h-40 items-center justify-center rounded-[18px] border border-dashed border-[#DDE3EA] bg-[#FAFBFC] px-4 text-center text-[12px] text-[#9BAAB8]">
-                  Sem agendamentos neste dia
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {(["manha", "tarde", "noite", "sem_horario"] as const).map((turn) => {
-                    const turnEvents = grouped[turn];
-                    if (turnEvents.length === 0) return null;
+          <div
+            className="relative bg-white"
+            style={{ height: timelineHeight }}
+          >
+            {hourMarks.map((minutes) => {
+              const top = (minutes - timelineBounds.start) * TIMELINE_PX_PER_MINUTE;
 
-                    return (
-                      <div key={turn}>
-                        <div className="mb-2 flex items-center justify-between gap-2">
-                          <p
-                            className={cn(
-                              "text-[10px] font-semibold uppercase tracking-[0.12em]",
-                              turn === "sem_horario" ? "text-[#B45309]" : "text-[#9BAAB8]"
-                            )}
-                          >
-                            {AGENDA_TURN_META[turn].label}
-                          </p>
-                          <span
-                            className={cn(
-                              "text-[10px] font-medium",
-                              turn === "sem_horario" ? "text-[#B45309]" : "text-[#9BAAB8]"
-                            )}
-                          >
-                            {fmtNum(turnEvents.length)}
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {turnEvents.map((event) => (
-                            <AgendaEventCard
-                              key={event.id}
-                              event={event}
-                              compact
-                              onOpen={onOpen}
-                            />
-                          ))}
-                        </div>
+              return (
+                <div
+                  key={minutes}
+                  className="absolute left-0 right-0 flex items-start"
+                  style={{ top }}
+                  aria-hidden="true"
+                >
+                  <div className="w-14 shrink-0 pr-3 pt-0.5 text-right">
+                    <span className="font-mono text-[10px] font-medium text-[#7C8B99]">
+                      {formatAgendaMinutes(minutes)}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-px flex-1 bg-[#EEF1F4]" />
+                </div>
+              );
+            })}
+
+            <div
+              className="absolute inset-y-0 left-14 right-0 grid"
+              style={{ gridTemplateColumns: `repeat(7, minmax(${WEEK_DAY_MIN_WIDTH}px, 1fr))` }}
+            >
+              {weekDays.map((day) => {
+                const dayEvents = events.filter((event) => isSameDay(event.dateValue, day));
+                const dayTimedEvents = dayEvents.filter((event) => event.timeMinutes !== null);
+                const layouts = buildTimelineEventLayouts(
+                  dayTimedEvents,
+                  timelineBounds.start
+                );
+
+                return (
+                  <div
+                    key={day.toISOString()}
+                    className={cn(
+                      "relative border-l border-[#E2E6EA] px-1.5",
+                      isToday(day) && "bg-[#F7FAFF]"
+                    )}
+                  >
+                    {layouts.length === 0 ? (
+                      <div className="absolute inset-x-2 top-4 flex min-h-20 items-center justify-center rounded-[16px] border border-dashed border-[#E2E6EB] bg-[#FAFBFC]/70 px-2 text-center text-[11px] text-[#9BAAB8]">
+                        Sem agendamentos
                       </div>
-                    );
-                  })}
+                    ) : (
+                      layouts.map((layout) => (
+                        <div
+                          key={layout.event.id}
+                          className="absolute px-0.5"
+                          style={{
+                            top: layout.top,
+                            height: layout.height,
+                            left: `${layout.leftPercent}%`,
+                            width: layout.hasOverlap
+                              ? `calc(${layout.widthPercent}% - 4px)`
+                              : `${layout.widthPercent}%`,
+                          }}
+                        >
+                          <AgendaTimelineEventCard
+                            event={layout.event}
+                            onOpen={onOpen}
+                            density="week"
+                          />
+                        </div>
+                      ))
+                    )}
+                  </div>
+                );
+              })}
+
+              {currentTop !== null && weekDays.some((day) => isToday(day)) ? (
+                <div
+                  className="pointer-events-none absolute left-0 right-0 z-20 flex items-center"
+                  style={{ top: currentTop }}
+                  aria-hidden="true"
+                >
+                  <span className="ml-[-5px] h-2.5 w-2.5 shrink-0 rounded-full bg-clinic-green ring-2 ring-white animate-[pulseScale_2s_ease-in-out_infinite]" />
+                  <div className="flex-1 border-t-2 border-clinic-green/60" />
                 </div>
-              )}
+              ) : null}
             </div>
-          );
-        })}
+          </div>
+        </div>
       </div>
+
+      {untimedEvents.length > 0 ? (
+        <TurnSection
+          title={AGENDA_TURN_META.sem_horario.label}
+          subtitle="Agendamentos sem horário definido"
+          events={untimedEvents}
+          onOpen={onOpen}
+          highlight
+        />
+      ) : null}
     </div>
   );
 }
@@ -805,12 +1116,17 @@ function MonthAgendaView({
                         <div className="space-y-1.5 max-h-64 overflow-y-auto">
                           {dayEvents.map((event) => {
                             const fm = AGENDA_FUNNEL_META[event.funnel];
+                            const timeRange = getAgendaEventTimeRange(event);
                             return (
                               <button
                                 key={event.id}
                                 type="button"
                                 onClick={() => onOpen(event)}
-                                className="flex w-full items-start gap-2 rounded-[12px] border border-[#E2E6EB] bg-[#FAFBFC] px-2.5 py-1.5 text-left transition-colors hover:bg-[#F3F6FB]"
+                                style={{
+                                  background: `linear-gradient(135deg, ${fm.surface} 0%, #FFFFFF 135%)`,
+                                  borderColor: fm.border,
+                                }}
+                                className="flex w-full items-start gap-2 rounded-[12px] border px-2.5 py-1.5 text-left transition-colors hover:brightness-[0.98]"
                               >
                                 <span
                                   className="mt-1 h-2 w-2 shrink-0 rounded-full"
@@ -821,9 +1137,10 @@ function MonthAgendaView({
                                     {event.patientName}
                                   </p>
                                   <p className="font-mono text-[10px] text-[#7C8B99]">
-                                    {event.timeLabel ?? "Sem horário"}
-                                    {" · "}
-                                    {fm.label}
+                                    {timeRange ?? "Sem horário"}
+                                  </p>
+                                  <p className="truncate text-[10px] font-medium" style={{ color: fm.text }}>
+                                    {event.serviceLabel}
                                   </p>
                                   {event.isRetorno && (
                                     <span className="mt-0.5 inline-block rounded-full bg-[#EEF4FF] px-1.5 py-0.5 text-[9px] font-medium text-clinic-blue">
@@ -849,13 +1166,18 @@ function MonthAgendaView({
                     <>
                       {visibleEvents.map((event) => {
                         const funnelMeta = AGENDA_FUNNEL_META[event.funnel];
+                        const timeRange = getAgendaEventTimeRange(event);
 
                         return (
                           <button
                             key={event.id}
                             type="button"
                             onClick={() => onOpen(event)}
-                            className="flex w-full items-start gap-2 rounded-[14px] border border-[#E2E6EB] bg-[#FAFBFC] px-2.5 py-2 text-left transition-colors hover:bg-[#F3F6FB]"
+                            style={{
+                              background: `linear-gradient(135deg, ${funnelMeta.surface} 0%, #FFFFFF 135%)`,
+                              borderColor: funnelMeta.border,
+                            }}
+                            className="flex w-full items-start gap-2 rounded-[14px] border px-2.5 py-2 text-left transition-colors hover:brightness-[0.98]"
                           >
                             <span
                               className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
@@ -863,10 +1185,13 @@ function MonthAgendaView({
                             />
                             <div className="min-w-0">
                               <p className="font-mono text-[10px] font-medium text-[#7C8B99]">
-                                {event.timeLabel ?? "Sem horário"}
+                                {timeRange ?? "Sem horário"}
                               </p>
                               <p className="truncate text-[12px] font-medium text-[#0F1923]">
                                 {event.patientName}
+                              </p>
+                              <p className="truncate text-[10px] font-medium" style={{ color: funnelMeta.text }}>
+                                {event.serviceLabel}
                               </p>
                               {event.amount > 0 ? (
                                 <p className="mt-0.5 text-[10px] font-semibold text-clinic-blue">
@@ -1349,7 +1674,7 @@ export default function AbaAgenda() {
           ))}
         </div>
       ) : view === "day" ? (
-        <DayAgendaView
+        <DayTimelineView
           events={filteredEvents}
           anchorDate={anchorDate}
           onOpen={openEvent}

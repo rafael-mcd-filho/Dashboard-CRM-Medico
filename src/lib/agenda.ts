@@ -18,30 +18,50 @@ export const AGENDA_FUNNEL_META = {
   consultas: {
     key: "consultas",
     label: "Consultas",
+    serviceLabel: "Consulta médica",
     shortLabel: "Consulta",
-    color: "#1A56DB",
-    soft: "bg-[#EEF4FF] text-clinic-blue border-[#D7E6FF]",
+    color: "#8B5E34",
+    surface: "#FFF7ED",
+    border: "#E7C9AF",
+    text: "#6F461E",
+    soft: "bg-[#FFF7ED] text-[#6F461E] border-[#E7C9AF]",
+    durationMinutes: 30,
   },
   espirometria: {
     key: "espirometria",
     label: "Espirometria",
+    serviceLabel: "Exame de espirometria",
     shortLabel: "Espiro",
-    color: "#0891B2",
-    soft: "bg-[#EAF8FC] text-clinic-teal border-[#C9EEF7]",
+    color: "#16A34A",
+    surface: "#EDFFF3",
+    border: "#BDEFCB",
+    text: "#0C6E28",
+    soft: "bg-[#EDFFF3] text-[#0C6E28] border-[#BDEFCB]",
+    durationMinutes: 15,
   },
   broncoscopia: {
     key: "broncoscopia",
     label: "Broncoscopia",
+    serviceLabel: "Broncoscopia",
     shortLabel: "Bronco",
-    color: "#0E9F6E",
-    soft: "bg-[#E8F8F1] text-clinic-green border-[#CDEEDD]",
+    color: "#1D4ED8",
+    surface: "#EEF4FF",
+    border: "#BCD2FF",
+    text: "#153E9B",
+    soft: "bg-[#EEF4FF] text-[#153E9B] border-[#BCD2FF]",
+    durationMinutes: 30,
   },
   cirurgia: {
     key: "cirurgia",
     label: "Cirurgia",
-    shortLabel: "Cirurgia",
-    color: "#7C3AED",
-    soft: "bg-[#F3EDFF] text-clinic-purple border-[#E5D8FF]",
+    serviceLabel: "Cirurgia de hiperidrose",
+    shortLabel: "Hiperidrose",
+    color: "#A3B32F",
+    surface: "#FAFDEB",
+    border: "#DCE88C",
+    text: "#58630D",
+    soft: "bg-[#FAFDEB] text-[#58630D] border-[#DCE88C]",
+    durationMinutes: 90,
   },
 } as const;
 
@@ -83,12 +103,14 @@ export type AgendaEvent = {
   dateValue: Date;
   timeLabel: string | null;
   timeMinutes: number | null;
+  durationMinutes: number;
   turn: AgendaTurnKey;
   responsible: string;
   stage: string;
   modality: string;
   paymentForm: string;
   isRetorno: boolean;
+  serviceLabel: string;
   typeLabel: string | null;
   amount: number;
   origin: string;
@@ -144,6 +166,33 @@ export function getAgendaMinutes(value: string | null | undefined) {
   return hours * 60 + minutes;
 }
 
+export function formatAgendaMinutes(totalMinutes: number) {
+  const normalized = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+export function formatAgendaDuration(minutes: number) {
+  return `${minutes} min`;
+}
+
+export function getAgendaEventEndMinutes(
+  event: Pick<AgendaEvent, "timeMinutes" | "durationMinutes">
+) {
+  return event.timeMinutes === null ? null : event.timeMinutes + event.durationMinutes;
+}
+
+export function getAgendaEventTimeRange(
+  event: Pick<AgendaEvent, "timeLabel" | "timeMinutes" | "durationMinutes">
+) {
+  if (event.timeMinutes === null) return null;
+
+  const start = event.timeLabel ?? formatAgendaMinutes(event.timeMinutes);
+  const end = formatAgendaMinutes(event.timeMinutes + event.durationMinutes);
+  return `${start}-${end}`;
+}
+
 export function getAgendaTurn(value: string | null | undefined): AgendaTurnKey {
   const minutes = getAgendaMinutes(value);
 
@@ -167,6 +216,9 @@ export function sortAgendaEvents(a: AgendaEvent, b: AgendaEvent) {
     const timeDiff = a.timeMinutes - b.timeMinutes;
     if (timeDiff !== 0) return timeDiff;
   }
+
+  const durationDiff = b.durationMinutes - a.durationMinutes;
+  if (durationDiff !== 0) return durationDiff;
 
   return a.patientName.localeCompare(b.patientName);
 }
